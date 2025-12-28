@@ -1,0 +1,141 @@
+# ==========================================
+# Money Control - .gitignore
+# ==========================================
+
+# ==================== Environment ====================
+.env
+.env.local
+.env.*.local
+*.env
+.envrc
+
+# ==================== IDE ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ==================== Go Backend ====================
+# Binaries
+backend/bin/
+backend/services/*/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.txt
+
+# Go workspace file
+go.work
+
+# Vendor directory (if not committing deps)
+# vendor/
+
+# ==================== Node.js / Frontend ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+frontend/web/dist/
+frontend/web/build/
+frontend/mobile/.expo/
+frontend/mobile/dist/
+
+# Parcel/Vite cache
+.cache/
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# ==================== React Native / Expo ====================
+frontend/mobile/node_modules/
+frontend/mobile/.expo/
+frontend/mobile/web-build/
+frontend/mobile/ios/
+frontend/mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# ==================== Docker ====================
+# Local docker overrides
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ==================== Database ====================
+*.db
+*.sqlite
+*.sqlite3
+data/
+postgres-data/
+
+# ==================== Logs ====================
+logs/
+*.log
+log/
+
+# ==================== Temporary files ====================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+
+# ==================== Secrets & Credentials ====================
+*.pem
+*.crt
+*.key
+secrets/
+credentials/
+
+# ==================== Generated files ====================
+# Proto generated files (uncomment if regenerating on build)
+# backend/proto/*/*.pb.go
+# backend/proto/*/*_grpc.pb.go
+
+# ==================== Testing ====================
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# ==================== OS-specific ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ==================== Misc ====================
+*.pid
+*.seed
+*.pid.lock
+.eslintcache
+.stylelintcache
+
