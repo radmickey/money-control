@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package assets;
+
+option go_package = "github.com/radmickey/money-control/backend/proto/assets";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service AssetsService {
+  rpc CreateAsset(CreateAssetRequest) returns (Asset);
+  rpc GetAsset(GetAssetRequest) returns (Asset);
+  rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse);
+  rpc UpdateAsset(UpdateAssetRequest) returns (Asset);
+  rpc DeleteAsset(DeleteAssetRequest) returns (google.protobuf.Empty);
+
+  rpc GetAssetPrice(GetAssetPriceRequest) returns (AssetPriceResponse);
+  rpc GetMultipleAssetPrices(GetMultipleAssetPricesRequest) returns (GetMultipleAssetPricesResponse);
+  rpc RefreshAssetPrices(RefreshAssetPricesRequest) returns (RefreshAssetPricesResponse);
+
+  rpc GetAssetHistory(GetAssetHistoryRequest) returns (AssetHistoryResponse);
+  rpc GetPortfolioPerformance(GetPortfolioPerformanceRequest) returns (PortfolioPerformanceResponse);
+
+  rpc SearchAssets(SearchAssetsRequest) returns (SearchAssetsResponse);
+}
+
+enum AssetType {
+  ASSET_TYPE_UNSPECIFIED = 0;
+  ASSET_TYPE_STOCK = 1;
+  ASSET_TYPE_CRYPTO = 2;
+  ASSET_TYPE_ETF = 3;
+  ASSET_TYPE_REAL_ESTATE = 4;
+  ASSET_TYPE_CASH = 5;
+  ASSET_TYPE_BOND = 6;
+  ASSET_TYPE_COMMODITY = 7;
+  ASSET_TYPE_OTHER = 8;
+}
+
+message Asset {
+  string id = 1;
+  string user_id = 2;
+  string sub_account_id = 3;
+  string symbol = 4;
+  string name = 5;
+  AssetType type = 6;
+  double quantity = 7;
+  double purchase_price = 8;
+  double current_price = 9;
+  string currency = 10;
+  double total_value = 11;
+  double profit_loss = 12;
+  double profit_loss_percent = 13;
+  google.protobuf.Timestamp purchase_date = 14;
+  google.protobuf.Timestamp price_updated_at = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+  map<string, string> metadata = 18;
+}
+
+message CreateAssetRequest {
+  string user_id = 1;
+  string sub_account_id = 2;
+  string symbol = 3;
+  string name = 4;
+  AssetType type = 5;
+  double quantity = 6;
+  double purchase_price = 7;
+  string currency = 8;
+  google.protobuf.Timestamp purchase_date = 9;
+  map<string, string> metadata = 10;
+}
+
+message GetAssetRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message ListAssetsRequest {
+  string user_id = 1;
+  string sub_account_id = 2;
+  AssetType type = 3;
+  int32 page = 4;
+  int32 page_size = 5;
+}
+
+message ListAssetsResponse {
+  repeated Asset assets = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  double total_value = 5;
+  double total_profit_loss = 6;
+}
+
+message UpdateAssetRequest {
+  string id = 1;
+  string user_id = 2;
+  double quantity = 3;
+  double purchase_price = 4;
+  double current_price = 5;
+  string name = 6;
+  map<string, string> metadata = 7;
+}
+
+message DeleteAssetRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message GetAssetPriceRequest {
+  string symbol = 1;
+  AssetType type = 2;
+}
+
+message AssetPriceResponse {
+  string symbol = 1;
+  double price = 2;
+  string currency = 3;
+  double change_24h = 4;
+  double change_percent_24h = 5;
+  double high_24h = 6;
+  double low_24h = 7;
+  double volume_24h = 8;
+  double market_cap = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetMultipleAssetPricesRequest {
+  repeated AssetPriceQuery queries = 1;
+}
+
+message AssetPriceQuery {
+  string symbol = 1;
+  AssetType type = 2;
+}
+
+message GetMultipleAssetPricesResponse {
+  map<string, AssetPriceResponse> prices = 1;
+  repeated string failed_symbols = 2;
+}
+
+message RefreshAssetPricesRequest {
+  string user_id = 1;
+  repeated string asset_ids = 2;
+}
+
+message RefreshAssetPricesResponse {
+  int32 updated_count = 1;
+  repeated string failed_ids = 2;
+}
+
+message GetAssetHistoryRequest {
+  string symbol = 1;
+  AssetType type = 2;
+  string interval = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+}
+
+message AssetHistoryResponse {
+  string symbol = 1;
+  repeated PricePoint history = 2;
+}
+
+message PricePoint {
+  google.protobuf.Timestamp timestamp = 1;
+  double open = 2;
+  double high = 3;
+  double low = 4;
+  double close = 5;
+  double volume = 6;
+}
+
+message GetPortfolioPerformanceRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  google.protobuf.Timestamp start_date = 3;
+  google.protobuf.Timestamp end_date = 4;
+}
+
+message PortfolioPerformanceResponse {
+  double total_value = 1;
+  double total_invested = 2;
+  double total_profit_loss = 3;
+  double profit_loss_percent = 4;
+  string currency = 5;
+  repeated AssetAllocation allocation = 6;
+  repeated PerformancePoint history = 7;
+}
+
+message AssetAllocation {
+  AssetType type = 1;
+  double value = 2;
+  double percentage = 3;
+}
+
+message PerformancePoint {
+  google.protobuf.Timestamp date = 1;
+  double value = 2;
+}
+
+message SearchAssetsRequest {
+  string query = 1;
+  AssetType type = 2;
+  int32 limit = 3;
+}
+
+message SearchAssetsResponse {
+  repeated AssetSearchResult results = 1;
+}
+
+message AssetSearchResult {
+  string symbol = 1;
+  string name = 2;
+  AssetType type = 3;
+  string exchange = 4;
+  string currency = 5;
+}
+

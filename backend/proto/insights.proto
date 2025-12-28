@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package insights;
+
+option go_package = "github.com/radmickey/money-control/backend/proto/insights";
+
+import "google/protobuf/timestamp.proto";
+
+service InsightsService {
+  rpc GetNetWorth(GetNetWorthRequest) returns (NetWorthResponse);
+  rpc GetNetWorthHistory(GetNetWorthHistoryRequest) returns (NetWorthHistoryResponse);
+
+  rpc GetAllocation(GetAllocationRequest) returns (AllocationResponse);
+  rpc GetBalanceChanges(GetBalanceChangesRequest) returns (BalanceChangesResponse);
+  rpc GetTrends(GetTrendsRequest) returns (TrendsResponse);
+
+  rpc GetDashboardSummary(GetDashboardSummaryRequest) returns (DashboardSummaryResponse);
+  rpc GetCashFlow(GetCashFlowRequest) returns (CashFlowResponse);
+
+  rpc CreateSnapshot(CreateSnapshotRequest) returns (Snapshot);
+  rpc GetSnapshots(GetSnapshotsRequest) returns (GetSnapshotsResponse);
+}
+
+message Snapshot {
+  string id = 1;
+  string user_id = 2;
+  double total_net_worth = 3;
+  string currency = 4;
+  string allocation_data = 5;
+  google.protobuf.Timestamp date = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message GetNetWorthRequest {
+  string user_id = 1;
+  string base_currency = 2;
+}
+
+message NetWorthResponse {
+  double total_net_worth = 1;
+  string currency = 2;
+  double change_24h = 3;
+  double change_percent_24h = 4;
+  double change_7d = 5;
+  double change_percent_7d = 6;
+  double change_30d = 7;
+  double change_percent_30d = 8;
+  google.protobuf.Timestamp calculated_at = 9;
+}
+
+message GetNetWorthHistoryRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  string period = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+}
+
+message NetWorthHistoryResponse {
+  repeated NetWorthPoint history = 1;
+  string currency = 2;
+}
+
+message NetWorthPoint {
+  google.protobuf.Timestamp date = 1;
+  double value = 2;
+}
+
+message GetAllocationRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  string group_by = 3;
+}
+
+message AllocationResponse {
+  repeated AllocationItem allocations = 1;
+  double total_value = 2;
+  string currency = 3;
+}
+
+message AllocationItem {
+  string category = 1;
+  string name = 2;
+  double value = 3;
+  double percentage = 4;
+  string color = 5;
+}
+
+message GetBalanceChangesRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  string period = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+}
+
+message BalanceChangesResponse {
+  repeated BalanceChange changes = 1;
+  double total_change = 2;
+  double total_change_percent = 3;
+  string currency = 4;
+}
+
+message BalanceChange {
+  string account_id = 1;
+  string account_name = 2;
+  double starting_balance = 3;
+  double ending_balance = 4;
+  double change = 5;
+  double change_percent = 6;
+}
+
+message GetTrendsRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  string period = 3;
+  string metric = 4;
+}
+
+message TrendsResponse {
+  string metric = 1;
+  string period = 2;
+  repeated TrendPoint data = 3;
+  double average = 4;
+  double min = 5;
+  double max = 6;
+  string trend_direction = 7;
+}
+
+message TrendPoint {
+  google.protobuf.Timestamp date = 1;
+  double value = 2;
+  string label = 3;
+}
+
+message GetDashboardSummaryRequest {
+  string user_id = 1;
+  string base_currency = 2;
+}
+
+message DashboardSummaryResponse {
+  double net_worth = 1;
+  double net_worth_change_24h = 2;
+  double net_worth_change_percent_24h = 3;
+
+  double total_assets = 4;
+  double total_liabilities = 5;
+
+  double monthly_income = 6;
+  double monthly_expenses = 7;
+  double monthly_savings = 8;
+  double savings_rate = 9;
+
+  repeated AllocationItem top_allocations = 10;
+  repeated RecentTransaction recent_transactions = 11;
+  repeated TopPerformer top_performers = 12;
+
+  string currency = 13;
+  google.protobuf.Timestamp calculated_at = 14;
+}
+
+message RecentTransaction {
+  string id = 1;
+  string description = 2;
+  double amount = 3;
+  string currency = 4;
+  string category = 5;
+  google.protobuf.Timestamp date = 6;
+}
+
+message TopPerformer {
+  string symbol = 1;
+  string name = 2;
+  double value = 3;
+  double change = 4;
+  double change_percent = 5;
+}
+
+message GetCashFlowRequest {
+  string user_id = 1;
+  string base_currency = 2;
+  string period = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+}
+
+message CashFlowResponse {
+  repeated CashFlowPeriod periods = 1;
+  double total_income = 2;
+  double total_expenses = 3;
+  double net_cash_flow = 4;
+  string currency = 5;
+}
+
+message CashFlowPeriod {
+  string label = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+  double income = 4;
+  double expenses = 5;
+  double net = 6;
+}
+
+message CreateSnapshotRequest {
+  string user_id = 1;
+  string base_currency = 2;
+}
+
+message GetSnapshotsRequest {
+  string user_id = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+  int32 limit = 4;
+}
+
+message GetSnapshotsResponse {
+  repeated Snapshot snapshots = 1;
+}
+

@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package currency;
+
+option go_package = "github.com/radmickey/money-control/backend/proto/currency";
+
+import "google/protobuf/timestamp.proto";
+
+service CurrencyService {
+  rpc GetExchangeRate(GetExchangeRateRequest) returns (ExchangeRateResponse);
+  rpc GetMultipleExchangeRates(GetMultipleExchangeRatesRequest) returns (GetMultipleExchangeRatesResponse);
+  rpc ConvertAmount(ConvertAmountRequest) returns (ConvertAmountResponse);
+  rpc ConvertMultipleAmounts(ConvertMultipleAmountsRequest) returns (ConvertMultipleAmountsResponse);
+
+  rpc ListSupportedCurrencies(ListSupportedCurrenciesRequest) returns (ListSupportedCurrenciesResponse);
+  rpc GetRateHistory(GetRateHistoryRequest) returns (RateHistoryResponse);
+
+  rpc RefreshRates(RefreshRatesRequest) returns (RefreshRatesResponse);
+  rpc GetLastUpdateTime(GetLastUpdateTimeRequest) returns (GetLastUpdateTimeResponse);
+}
+
+message ExchangeRate {
+  string from_currency = 1;
+  string to_currency = 2;
+  double rate = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetExchangeRateRequest {
+  string from_currency = 1;
+  string to_currency = 2;
+}
+
+message ExchangeRateResponse {
+  ExchangeRate rate = 1;
+}
+
+message GetMultipleExchangeRatesRequest {
+  string base_currency = 1;
+  repeated string target_currencies = 2;
+}
+
+message GetMultipleExchangeRatesResponse {
+  string base_currency = 1;
+  map<string, double> rates = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+message ConvertAmountRequest {
+  double amount = 1;
+  string from_currency = 2;
+  string to_currency = 3;
+}
+
+message ConvertAmountResponse {
+  double original_amount = 1;
+  string from_currency = 2;
+  double converted_amount = 3;
+  string to_currency = 4;
+  double rate_used = 5;
+  google.protobuf.Timestamp rate_timestamp = 6;
+}
+
+message ConvertMultipleAmountsRequest {
+  repeated AmountToConvert amounts = 1;
+  string to_currency = 2;
+}
+
+message AmountToConvert {
+  string id = 1;
+  double amount = 2;
+  string from_currency = 3;
+}
+
+message ConvertMultipleAmountsResponse {
+  repeated ConvertedAmount converted = 1;
+  double total = 2;
+  string to_currency = 3;
+}
+
+message ConvertedAmount {
+  string id = 1;
+  double original_amount = 2;
+  string from_currency = 3;
+  double converted_amount = 4;
+  double rate_used = 5;
+}
+
+message Currency {
+  string code = 1;
+  string name = 2;
+  string symbol = 3;
+  int32 decimal_places = 4;
+  bool is_crypto = 5;
+}
+
+message ListSupportedCurrenciesRequest {
+  bool include_crypto = 1;
+}
+
+message ListSupportedCurrenciesResponse {
+  repeated Currency currencies = 1;
+}
+
+message GetRateHistoryRequest {
+  string from_currency = 1;
+  string to_currency = 2;
+  google.protobuf.Timestamp start_date = 3;
+  google.protobuf.Timestamp end_date = 4;
+}
+
+message RateHistoryResponse {
+  string from_currency = 1;
+  string to_currency = 2;
+  repeated RatePoint history = 3;
+}
+
+message RatePoint {
+  google.protobuf.Timestamp date = 1;
+  double rate = 2;
+}
+
+message RefreshRatesRequest {
+  string base_currency = 1;
+}
+
+message RefreshRatesResponse {
+  bool success = 1;
+  int32 rates_updated = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+message GetLastUpdateTimeRequest {}
+
+message GetLastUpdateTimeResponse {
+  google.protobuf.Timestamp last_update = 1;
+  string base_currency = 2;
+}
+

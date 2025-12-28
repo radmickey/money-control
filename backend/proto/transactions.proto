@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package transactions;
+
+option go_package = "github.com/radmickey/money-control/backend/proto/transactions";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service TransactionsService {
+  rpc CreateTransaction(CreateTransactionRequest) returns (Transaction);
+  rpc GetTransaction(GetTransactionRequest) returns (Transaction);
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
+  rpc UpdateTransaction(UpdateTransactionRequest) returns (Transaction);
+  rpc DeleteTransaction(DeleteTransactionRequest) returns (google.protobuf.Empty);
+
+  rpc GetTransactionsByDateRange(GetTransactionsByDateRangeRequest) returns (ListTransactionsResponse);
+  rpc GetTransactionsByCategory(GetTransactionsByCategoryRequest) returns (ListTransactionsResponse);
+  rpc GetTransactionsSummary(GetTransactionsSummaryRequest) returns (TransactionsSummaryResponse);
+
+  rpc CategorizeTransaction(CategorizeTransactionRequest) returns (Transaction);
+  rpc BulkCategorize(BulkCategorizeRequest) returns (BulkCategorizeResponse);
+}
+
+enum TransactionType {
+  TRANSACTION_TYPE_UNSPECIFIED = 0;
+  TRANSACTION_TYPE_INCOME = 1;
+  TRANSACTION_TYPE_EXPENSE = 2;
+  TRANSACTION_TYPE_TRANSFER = 3;
+}
+
+enum TransactionCategory {
+  TRANSACTION_CATEGORY_UNSPECIFIED = 0;
+  TRANSACTION_CATEGORY_SALARY = 1;
+  TRANSACTION_CATEGORY_INVESTMENT_INCOME = 2;
+  TRANSACTION_CATEGORY_FOOD = 3;
+  TRANSACTION_CATEGORY_TRANSPORT = 4;
+  TRANSACTION_CATEGORY_UTILITIES = 5;
+  TRANSACTION_CATEGORY_ENTERTAINMENT = 6;
+  TRANSACTION_CATEGORY_SHOPPING = 7;
+  TRANSACTION_CATEGORY_HEALTHCARE = 8;
+  TRANSACTION_CATEGORY_EDUCATION = 9;
+  TRANSACTION_CATEGORY_TRAVEL = 10;
+  TRANSACTION_CATEGORY_HOUSING = 11;
+  TRANSACTION_CATEGORY_INSURANCE = 12;
+  TRANSACTION_CATEGORY_TAXES = 13;
+  TRANSACTION_CATEGORY_GIFTS = 14;
+  TRANSACTION_CATEGORY_TRANSFER = 15;
+  TRANSACTION_CATEGORY_OTHER = 16;
+}
+
+message Transaction {
+  string id = 1;
+  string user_id = 2;
+  string sub_account_id = 3;
+  double amount = 4;
+  string currency = 5;
+  TransactionType type = 6;
+  TransactionCategory category = 7;
+  string custom_category = 8;
+  string description = 9;
+  string merchant = 10;
+  google.protobuf.Timestamp date = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  map<string, string> metadata = 14;
+  string transfer_to_sub_account_id = 15;
+}
+
+message CreateTransactionRequest {
+  string user_id = 1;
+  string sub_account_id = 2;
+  double amount = 3;
+  string currency = 4;
+  TransactionType type = 5;
+  TransactionCategory category = 6;
+  string custom_category = 7;
+  string description = 8;
+  string merchant = 9;
+  google.protobuf.Timestamp date = 10;
+  string transfer_to_sub_account_id = 11;
+  map<string, string> metadata = 12;
+}
+
+message GetTransactionRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message ListTransactionsRequest {
+  string user_id = 1;
+  string sub_account_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  string sort_by = 5;
+  bool sort_desc = 6;
+}
+
+message ListTransactionsResponse {
+  repeated Transaction transactions = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message UpdateTransactionRequest {
+  string id = 1;
+  string user_id = 2;
+  double amount = 3;
+  TransactionCategory category = 4;
+  string custom_category = 5;
+  string description = 6;
+  string merchant = 7;
+  google.protobuf.Timestamp date = 8;
+}
+
+message DeleteTransactionRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message GetTransactionsByDateRangeRequest {
+  string user_id = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+  string sub_account_id = 4;
+  int32 page = 5;
+  int32 page_size = 6;
+}
+
+message GetTransactionsByCategoryRequest {
+  string user_id = 1;
+  TransactionCategory category = 2;
+  google.protobuf.Timestamp start_date = 3;
+  google.protobuf.Timestamp end_date = 4;
+  int32 page = 5;
+  int32 page_size = 6;
+}
+
+message GetTransactionsSummaryRequest {
+  string user_id = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+  string base_currency = 4;
+}
+
+message TransactionsSummaryResponse {
+  double total_income = 1;
+  double total_expenses = 2;
+  double net_flow = 3;
+  string currency = 4;
+  map<string, double> by_category = 5;
+  int32 transaction_count = 6;
+}
+
+message CategorizeTransactionRequest {
+  string id = 1;
+  string user_id = 2;
+  TransactionCategory category = 3;
+  string custom_category = 4;
+}
+
+message BulkCategorizeRequest {
+  string user_id = 1;
+  repeated string transaction_ids = 2;
+  TransactionCategory category = 3;
+}
+
+message BulkCategorizeResponse {
+  int32 updated_count = 1;
+  repeated string failed_ids = 2;
+}
+
