@@ -1,0 +1,385 @@
+version: '3.8'
+
+services:
+  # ==================== Databases ====================
+  auth-db:
+    image: postgres:16-alpine
+    container_name: mc-auth-db
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  accounts-db:
+    image: postgres:16-alpine
+    container_name: mc-accounts-db
+    environment:
+      POSTGRES_DB: accounts_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - accounts-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  transactions-db:
+    image: postgres:16-alpine
+    container_name: mc-transactions-db
+    environment:
+      POSTGRES_DB: transactions_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - transactions-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  assets-db:
+    image: postgres:16-alpine
+    container_name: mc-assets-db
+    environment:
+      POSTGRES_DB: assets_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - assets-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  currency-db:
+    image: postgres:16-alpine
+    container_name: mc-currency-db
+    environment:
+      POSTGRES_DB: currency_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - currency-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  insights-db:
+    image: postgres:16-alpine
+    container_name: mc-insights-db
+    environment:
+      POSTGRES_DB: insights_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - insights-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==================== Redis ====================
+  redis:
+    image: redis:7-alpine
+    container_name: mc-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==================== Microservices ====================
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: auth
+    container_name: mc-auth-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@auth-db:5432/auth_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_DURATION=15m
+      - JWT_REFRESH_DURATION=168h
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GRPC_PORT=50051
+      - HTTP_PORT=8091
+    ports:
+      - "8091:8091"
+      - "50051:50051"
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  accounts-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: accounts
+    container_name: mc-accounts-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@accounts-db:5432/accounts_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GRPC_PORT=50052
+      - HTTP_PORT=8082
+    ports:
+      - "8082:8082"
+      - "50052:50052"
+    depends_on:
+      accounts-db:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  transactions-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: transactions
+    container_name: mc-transactions-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@transactions-db:5432/transactions_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GRPC_PORT=50053
+      - HTTP_PORT=8083
+    ports:
+      - "8083:8083"
+      - "50053:50053"
+    depends_on:
+      transactions-db:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  assets-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: assets
+    container_name: mc-assets-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@assets-db:5432/assets_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+      - ALPHA_VANTAGE_PREMIUM=${ALPHA_VANTAGE_PREMIUM:-false}
+      - COINGECKO_API_URL=https://api.coingecko.com/api/v3
+      - GRPC_PORT=50054
+      - HTTP_PORT=8084
+    ports:
+      - "8084:8084"
+      - "50054:50054"
+    depends_on:
+      assets-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  currency-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: currency
+    container_name: mc-currency-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@currency-db:5432/currency_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - EXCHANGERATES_API_KEY=${EXCHANGERATES_API_KEY}
+      - GRPC_PORT=50055
+      - HTTP_PORT=8085
+    ports:
+      - "8085:8085"
+      - "50055:50055"
+    depends_on:
+      currency-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  insights-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: insights
+    container_name: mc-insights-service
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD:-postgres}@insights-db:5432/insights_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_URL=auth-service:50051
+      - ACCOUNTS_SERVICE_URL=accounts-service:50052
+      - TRANSACTIONS_SERVICE_URL=transactions-service:50053
+      - ASSETS_SERVICE_URL=assets-service:50054
+      - CURRENCY_SERVICE_URL=currency-service:50055
+      - GRPC_PORT=50056
+      - HTTP_PORT=8086
+    ports:
+      - "8086:8086"
+      - "50056:50056"
+    depends_on:
+      insights-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      accounts-service:
+        condition: service_started
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ==================== API Gateway ====================
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway
+    container_name: mc-gateway
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - HTTP_PORT=9080
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL:-http://localhost:9080/api/v1/auth/google/callback}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - AUTH_SERVICE_URL=auth-service:50051
+      - ACCOUNTS_SERVICE_URL=accounts-service:50052
+      - TRANSACTIONS_SERVICE_URL=transactions-service:50053
+      - ASSETS_SERVICE_URL=assets-service:50054
+      - CURRENCY_SERVICE_URL=currency-service:50055
+      - INSIGHTS_SERVICE_URL=insights-service:50056
+    ports:
+      - "9080:9080"
+    depends_on:
+      - auth-service
+      - accounts-service
+      - transactions-service
+      - assets-service
+      - currency-service
+      - insights-service
+    networks:
+      - backend-network
+      - frontend-network
+    restart: unless-stopped
+
+  # ==================== Telegram Bot ====================
+  telegram-bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.telegram
+    container_name: mc-telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL}
+      - AUTH_SERVICE_URL=auth-service:50051
+      - ACCOUNTS_SERVICE_URL=accounts-service:50052
+      - INSIGHTS_SERVICE_URL=insights-service:50056
+      - PORT=8087
+    ports:
+      - "8087:8087"
+    depends_on:
+      - gateway
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ==================== Web Frontend ====================
+  web:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile
+    container_name: mc-web
+    environment:
+      - REACT_APP_API_URL=http://localhost:9080/api/v1
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+    networks:
+      - frontend-network
+    restart: unless-stopped
+
+networks:
+  backend-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge
+
+volumes:
+  auth-db-data:
+  accounts-db-data:
+  transactions-db-data:
+  assets-db-data:
+  currency-db-data:
+  insights-db-data:
+  redis-data:
+
