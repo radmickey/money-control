@@ -89,9 +89,11 @@ export const accountsAPI = {
   createSubAccount: (accountId: string, data: any) =>
     api.post(`/accounts/${accountId}/sub-accounts`, data),
   updateSubAccount: (accountId: string, subId: string, data: any) =>
-    api.put(`/accounts/${accountId}/sub-accounts/${subId}`, data),
+    api.put(`/sub-accounts/${subId}`, data),
   deleteSubAccount: (accountId: string, subId: string) =>
-    api.delete(`/accounts/${accountId}/sub-accounts/${subId}`),
+    api.delete(`/sub-accounts/${subId}`),
+  updateSubAccountBalance: (subId: string, balance: number) =>
+    api.patch(`/sub-accounts/${subId}/balance`, { balance }),
 };
 
 // Transactions API

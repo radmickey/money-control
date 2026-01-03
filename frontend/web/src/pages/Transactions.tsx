@@ -60,6 +60,7 @@ const Transactions: React.FC = () => {
     category: 'Other',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    currency: 'USD',
   });
 
   useEffect(() => {
@@ -80,14 +81,19 @@ const Transactions: React.FC = () => {
       category: 'Other',
       description: '',
       date: new Date().toISOString().split('T')[0],
+      currency: 'USD',
     });
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(Math.abs(value));
+  const formatCurrency = (value: number, currency: string = 'USD') => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+      }).format(Math.abs(value));
+    } catch {
+      return `${currency} ${Math.abs(value).toFixed(2)}`;
+    }
   };
 
   const formatDate = (dateValue: string | { seconds?: number; nanos?: number }) => {
@@ -255,7 +261,7 @@ const Transactions: React.FC = () => {
                     }`}
                   >
                     {getTransactionType(transaction.type) === 'income' ? '+' : '-'}
-                    {formatCurrency(transaction.amount)}
+                    {formatCurrency(transaction.amount, transaction.currency)}
                   </p>
                   <p className="text-sm text-midnight-400">{formatDate(transaction.date)}</p>
                 </div>
@@ -292,18 +298,36 @@ const Transactions: React.FC = () => {
                 ))}
               </div>
 
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Amount</label>
-                <input
-                  type="number"
-                  value={newTransaction.amount}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, amount: e.target.value })
-                  }
-                  className="input-field"
-                  placeholder="0.00"
-                  step="0.01"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Amount</label>
+                  <input
+                    type="number"
+                    value={newTransaction.amount}
+                    onChange={(e) =>
+                      setNewTransaction({ ...newTransaction, amount: e.target.value })
+                    }
+                    className="input-field"
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Currency</label>
+                  <select
+                    value={newTransaction.currency}
+                    onChange={(e) =>
+                      setNewTransaction({ ...newTransaction, currency: e.target.value })
+                    }
+                    className="input-field"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="JPY">JPY</option>
+                    <option value="RUB">RUB</option>
+                  </select>
+                </div>
               </div>
 
               <div>
