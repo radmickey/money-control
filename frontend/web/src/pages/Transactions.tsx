@@ -101,7 +101,7 @@ const Transactions: React.FC = () => {
     } else if (typeof transaction.date === 'string') {
       dateStr = transaction.date.split('T')[0];
     }
-    
+
     setEditingTransaction({
       id: transaction.id,
       form: {

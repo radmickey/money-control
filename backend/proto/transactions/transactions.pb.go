@@ -668,6 +668,8 @@ type UpdateTransactionRequest struct {
 	Description    string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	Merchant       string                 `protobuf:"bytes,7,opt,name=merchant,proto3" json:"merchant,omitempty"`
 	Date           *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=date,proto3" json:"date,omitempty"`
+	Type           TransactionType        `protobuf:"varint,9,opt,name=type,proto3,enum=transactions.TransactionType" json:"type,omitempty"`
+	Currency       string                 `protobuf:"bytes,10,opt,name=currency,proto3" json:"currency,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -756,6 +758,20 @@ func (x *UpdateTransactionRequest) GetDate() *timestamppb.Timestamp {
 		return x.Date
 	}
 	return nil
+}
+
+func (x *UpdateTransactionRequest) GetType() TransactionType {
+	if x != nil {
+		return x.Type
+	}
+	return TransactionType_TRANSACTION_TYPE_UNSPECIFIED
+}
+
+func (x *UpdateTransactionRequest) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
 }
 
 type DeleteTransactionRequest struct {
@@ -1368,7 +1384,7 @@ const file_proto_transactions_proto_rawDesc = "" +
 	"\ftransactions\x18\x01 \x03(\v2\x19.transactions.TransactionR\ftransactions\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xb1\x02\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x80\x03\n" +
 	"\x18UpdateTransactionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
@@ -1377,7 +1393,10 @@ const file_proto_transactions_proto_rawDesc = "" +
 	"\x0fcustom_category\x18\x05 \x01(\tR\x0ecustomCategory\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x1a\n" +
 	"\bmerchant\x18\a \x01(\tR\bmerchant\x12.\n" +
-	"\x04date\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x04date\"C\n" +
+	"\x04date\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x04date\x121\n" +
+	"\x04type\x18\t \x01(\x0e2\x1d.transactions.TransactionTypeR\x04type\x12\x1a\n" +
+	"\bcurrency\x18\n" +
+	" \x01(\tR\bcurrency\"C\n" +
 	"\x18DeleteTransactionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\"\x85\x02\n" +
@@ -1514,41 +1533,42 @@ var file_proto_transactions_proto_depIdxs = []int32{
 	2,  // 10: transactions.ListTransactionsResponse.transactions:type_name -> transactions.Transaction
 	1,  // 11: transactions.UpdateTransactionRequest.category:type_name -> transactions.TransactionCategory
 	19, // 12: transactions.UpdateTransactionRequest.date:type_name -> google.protobuf.Timestamp
-	19, // 13: transactions.GetTransactionsByDateRangeRequest.start_date:type_name -> google.protobuf.Timestamp
-	19, // 14: transactions.GetTransactionsByDateRangeRequest.end_date:type_name -> google.protobuf.Timestamp
-	1,  // 15: transactions.GetTransactionsByCategoryRequest.category:type_name -> transactions.TransactionCategory
-	19, // 16: transactions.GetTransactionsByCategoryRequest.start_date:type_name -> google.protobuf.Timestamp
-	19, // 17: transactions.GetTransactionsByCategoryRequest.end_date:type_name -> google.protobuf.Timestamp
-	19, // 18: transactions.GetTransactionsSummaryRequest.start_date:type_name -> google.protobuf.Timestamp
-	19, // 19: transactions.GetTransactionsSummaryRequest.end_date:type_name -> google.protobuf.Timestamp
-	18, // 20: transactions.TransactionsSummaryResponse.by_category:type_name -> transactions.TransactionsSummaryResponse.ByCategoryEntry
-	1,  // 21: transactions.CategorizeTransactionRequest.category:type_name -> transactions.TransactionCategory
-	1,  // 22: transactions.BulkCategorizeRequest.category:type_name -> transactions.TransactionCategory
-	3,  // 23: transactions.TransactionsService.CreateTransaction:input_type -> transactions.CreateTransactionRequest
-	4,  // 24: transactions.TransactionsService.GetTransaction:input_type -> transactions.GetTransactionRequest
-	5,  // 25: transactions.TransactionsService.ListTransactions:input_type -> transactions.ListTransactionsRequest
-	7,  // 26: transactions.TransactionsService.UpdateTransaction:input_type -> transactions.UpdateTransactionRequest
-	8,  // 27: transactions.TransactionsService.DeleteTransaction:input_type -> transactions.DeleteTransactionRequest
-	9,  // 28: transactions.TransactionsService.GetTransactionsByDateRange:input_type -> transactions.GetTransactionsByDateRangeRequest
-	10, // 29: transactions.TransactionsService.GetTransactionsByCategory:input_type -> transactions.GetTransactionsByCategoryRequest
-	11, // 30: transactions.TransactionsService.GetTransactionsSummary:input_type -> transactions.GetTransactionsSummaryRequest
-	13, // 31: transactions.TransactionsService.CategorizeTransaction:input_type -> transactions.CategorizeTransactionRequest
-	14, // 32: transactions.TransactionsService.BulkCategorize:input_type -> transactions.BulkCategorizeRequest
-	2,  // 33: transactions.TransactionsService.CreateTransaction:output_type -> transactions.Transaction
-	2,  // 34: transactions.TransactionsService.GetTransaction:output_type -> transactions.Transaction
-	6,  // 35: transactions.TransactionsService.ListTransactions:output_type -> transactions.ListTransactionsResponse
-	2,  // 36: transactions.TransactionsService.UpdateTransaction:output_type -> transactions.Transaction
-	20, // 37: transactions.TransactionsService.DeleteTransaction:output_type -> google.protobuf.Empty
-	6,  // 38: transactions.TransactionsService.GetTransactionsByDateRange:output_type -> transactions.ListTransactionsResponse
-	6,  // 39: transactions.TransactionsService.GetTransactionsByCategory:output_type -> transactions.ListTransactionsResponse
-	12, // 40: transactions.TransactionsService.GetTransactionsSummary:output_type -> transactions.TransactionsSummaryResponse
-	2,  // 41: transactions.TransactionsService.CategorizeTransaction:output_type -> transactions.Transaction
-	15, // 42: transactions.TransactionsService.BulkCategorize:output_type -> transactions.BulkCategorizeResponse
-	33, // [33:43] is the sub-list for method output_type
-	23, // [23:33] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	0,  // 13: transactions.UpdateTransactionRequest.type:type_name -> transactions.TransactionType
+	19, // 14: transactions.GetTransactionsByDateRangeRequest.start_date:type_name -> google.protobuf.Timestamp
+	19, // 15: transactions.GetTransactionsByDateRangeRequest.end_date:type_name -> google.protobuf.Timestamp
+	1,  // 16: transactions.GetTransactionsByCategoryRequest.category:type_name -> transactions.TransactionCategory
+	19, // 17: transactions.GetTransactionsByCategoryRequest.start_date:type_name -> google.protobuf.Timestamp
+	19, // 18: transactions.GetTransactionsByCategoryRequest.end_date:type_name -> google.protobuf.Timestamp
+	19, // 19: transactions.GetTransactionsSummaryRequest.start_date:type_name -> google.protobuf.Timestamp
+	19, // 20: transactions.GetTransactionsSummaryRequest.end_date:type_name -> google.protobuf.Timestamp
+	18, // 21: transactions.TransactionsSummaryResponse.by_category:type_name -> transactions.TransactionsSummaryResponse.ByCategoryEntry
+	1,  // 22: transactions.CategorizeTransactionRequest.category:type_name -> transactions.TransactionCategory
+	1,  // 23: transactions.BulkCategorizeRequest.category:type_name -> transactions.TransactionCategory
+	3,  // 24: transactions.TransactionsService.CreateTransaction:input_type -> transactions.CreateTransactionRequest
+	4,  // 25: transactions.TransactionsService.GetTransaction:input_type -> transactions.GetTransactionRequest
+	5,  // 26: transactions.TransactionsService.ListTransactions:input_type -> transactions.ListTransactionsRequest
+	7,  // 27: transactions.TransactionsService.UpdateTransaction:input_type -> transactions.UpdateTransactionRequest
+	8,  // 28: transactions.TransactionsService.DeleteTransaction:input_type -> transactions.DeleteTransactionRequest
+	9,  // 29: transactions.TransactionsService.GetTransactionsByDateRange:input_type -> transactions.GetTransactionsByDateRangeRequest
+	10, // 30: transactions.TransactionsService.GetTransactionsByCategory:input_type -> transactions.GetTransactionsByCategoryRequest
+	11, // 31: transactions.TransactionsService.GetTransactionsSummary:input_type -> transactions.GetTransactionsSummaryRequest
+	13, // 32: transactions.TransactionsService.CategorizeTransaction:input_type -> transactions.CategorizeTransactionRequest
+	14, // 33: transactions.TransactionsService.BulkCategorize:input_type -> transactions.BulkCategorizeRequest
+	2,  // 34: transactions.TransactionsService.CreateTransaction:output_type -> transactions.Transaction
+	2,  // 35: transactions.TransactionsService.GetTransaction:output_type -> transactions.Transaction
+	6,  // 36: transactions.TransactionsService.ListTransactions:output_type -> transactions.ListTransactionsResponse
+	2,  // 37: transactions.TransactionsService.UpdateTransaction:output_type -> transactions.Transaction
+	20, // 38: transactions.TransactionsService.DeleteTransaction:output_type -> google.protobuf.Empty
+	6,  // 39: transactions.TransactionsService.GetTransactionsByDateRange:output_type -> transactions.ListTransactionsResponse
+	6,  // 40: transactions.TransactionsService.GetTransactionsByCategory:output_type -> transactions.ListTransactionsResponse
+	12, // 41: transactions.TransactionsService.GetTransactionsSummary:output_type -> transactions.TransactionsSummaryResponse
+	2,  // 42: transactions.TransactionsService.CategorizeTransaction:output_type -> transactions.Transaction
+	15, // 43: transactions.TransactionsService.BulkCategorize:output_type -> transactions.BulkCategorizeResponse
+	34, // [34:44] is the sub-list for method output_type
+	24, // [24:34] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_proto_transactions_proto_init() }

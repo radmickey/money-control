@@ -106,11 +106,13 @@ func (h *GRPCHandler) UpdateTransaction(ctx context.Context, req *pb.UpdateTrans
 		ID:             req.Id,
 		UserID:         req.UserId,
 		Amount:         req.Amount,
-		Category:       models.TransactionCategory(req.Category.String()),
+		Type:           protoToTransactionType(req.Type),
+		Category:       protoToTransactionCategory(req.Category),
 		CustomCategory: req.CustomCategory,
 		Description:    req.Description,
 		Merchant:       req.Merchant,
 		Date:           date,
+		Currency:       req.Currency,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update transaction: %v", err)

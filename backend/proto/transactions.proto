@@ -112,6 +112,8 @@ message UpdateTransactionRequest {
   string description = 6;
   string merchant = 7;
   google.protobuf.Timestamp date = 8;
+  TransactionType type = 9;
+  string currency = 10;
 }
 
 message DeleteTransactionRequest {

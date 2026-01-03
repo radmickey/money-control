@@ -120,9 +120,11 @@ func (h *TransactionsHandler) UpdateTransaction(c *gin.Context) {
 
 	var req struct {
 		Amount      float64 `json:"amount"`
+		Type        string  `json:"type"`
 		Category    string  `json:"category"`
 		Description string  `json:"description"`
 		Date        string  `json:"date"`
+		Currency    string  `json:"currency"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,13 +138,20 @@ func (h *TransactionsHandler) UpdateTransaction(c *gin.Context) {
 		date = timestamppb.New(t)
 	}
 
+	currency := req.Currency
+	if currency == "" {
+		currency = "USD"
+	}
+
 	resp, err := h.proxy.Transactions.UpdateTransaction(c.Request.Context(), &transactionspb.UpdateTransactionRequest{
 		Id:          id,
 		UserId:      userID,
 		Amount:      req.Amount,
+		Type:        stringToTransactionType(req.Type),
 		Category:    stringToTransactionCategory(req.Category),
 		Description: req.Description,
 		Date:        date,
+		Currency:    currency,
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())

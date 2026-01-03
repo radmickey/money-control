@@ -122,11 +122,13 @@ type UpdateTransactionInput struct {
 	ID             string
 	UserID         string
 	Amount         float64
+	Type           models.TransactionType
 	Category       models.TransactionCategory
 	CustomCategory string
 	Description    string
 	Merchant       string
 	Date           time.Time
+	Currency       string
 }
 
 // UpdateTransaction updates a transaction
@@ -138,6 +140,9 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, input Update
 
 	if input.Amount != 0 {
 		tx.Amount = input.Amount
+	}
+	if input.Type != "" {
+		tx.Type = input.Type
 	}
 	if input.Category != "" {
 		tx.Category = input.Category
@@ -153,6 +158,9 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, input Update
 	}
 	if !input.Date.IsZero() {
 		tx.Date = input.Date
+	}
+	if input.Currency != "" {
+		tx.Currency = input.Currency
 	}
 
 	if err := s.txRepo.Update(ctx, tx); err != nil {
