@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchTransactions, createTransaction, updateTransaction, deleteTransaction, setFilters } from '../store/slices/transactionsSlice';
+import { fetchAccounts } from '../store/slices/accountsSlice';
 
 const categories = [
   'Food & Dining',
@@ -55,6 +56,8 @@ interface TransactionForm {
   description: string;
   date: string;
   currency: string;
+  accountId: string;
+  subAccountId: string;
 }
 
 const defaultForm: TransactionForm = {
@@ -64,6 +67,8 @@ const defaultForm: TransactionForm = {
   description: '',
   date: new Date().toISOString().split('T')[0],
   currency: 'USD',
+  accountId: '',
+  subAccountId: '',
 };
 
 const Transactions: React.FC = () => {
@@ -71,11 +76,16 @@ const Transactions: React.FC = () => {
   const { transactions, filters, pagination, loading } = useAppSelector(
     (state) => state.transactions
   );
+  const { accounts } = useAppSelector((state) => state.accounts);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<{ id: string; form: TransactionForm } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newTransaction, setNewTransaction] = useState<TransactionForm>(defaultForm);
+
+  useEffect(() => {
+    dispatch(fetchAccounts());
+  }, [dispatch]);
 
   useEffect(() => {
     dispatch(fetchTransactions({ ...filters, page: pagination.page }));
@@ -86,6 +96,7 @@ const Transactions: React.FC = () => {
       createTransaction({
         ...newTransaction,
         amount: parseFloat(newTransaction.amount),
+        subAccountId: newTransaction.subAccountId || undefined,
       })
     );
     setShowCreateModal(false);
@@ -440,6 +451,60 @@ const Transactions: React.FC = () => {
                   }
                   className="input-field"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Account</label>
+                  <select
+                    value={newTransaction.accountId}
+                    onChange={(e) => {
+                      const accountId = e.target.value;
+                      const account = (accounts || []).find(a => a.id === accountId);
+                      setNewTransaction({
+                        ...newTransaction,
+                        accountId,
+                        subAccountId: '',
+                        currency: account?.currency || newTransaction.currency,
+                      });
+                    }}
+                    className="input-field"
+                  >
+                    <option value="">No account</option>
+                    {(accounts || []).map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Sub-Account</label>
+                  <select
+                    value={newTransaction.subAccountId}
+                    onChange={(e) => {
+                      const subAccountId = e.target.value;
+                      const account = (accounts || []).find(a => a.id === newTransaction.accountId);
+                      const subAccount = (account?.subAccounts || []).find(s => s.id === subAccountId);
+                      setNewTransaction({
+                        ...newTransaction,
+                        subAccountId,
+                        currency: subAccount?.currency || account?.currency || newTransaction.currency,
+                      });
+                    }}
+                    className="input-field"
+                    disabled={!newTransaction.accountId}
+                  >
+                    <option value="">Select sub-account</option>
+                    {newTransaction.accountId && (accounts || [])
+                      .find(a => a.id === newTransaction.accountId)
+                      ?.subAccounts?.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} ({sub.currency})
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
             </div>
 

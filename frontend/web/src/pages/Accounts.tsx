@@ -37,7 +37,7 @@ const Accounts: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<{ id: string; name: string } | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [editingSubAccount, setEditingSubAccount] = useState<{ accountId: string; id: string; name: string; balance: number } | null>(null);
+  const [editingSubAccount, setEditingSubAccount] = useState<{ accountId: string; id: string; name: string; balance: string } | null>(null);
   const [newAccount, setNewAccount] = useState({
     name: '',
     type: 'bank',
@@ -114,7 +114,7 @@ const Accounts: React.FC = () => {
   };
 
   const handleEditSubAccount = (accountId: string, sub: { id: string; name: string; balance: number }) => {
-    setEditingSubAccount({ accountId, id: sub.id, name: sub.name, balance: sub.balance });
+    setEditingSubAccount({ accountId, id: sub.id, name: sub.name, balance: String(sub.balance || '') });
     setShowEditSubAccountModal(true);
   };
 
@@ -125,7 +125,7 @@ const Accounts: React.FC = () => {
         subAccountId: editingSubAccount.id,
         data: {
           name: editingSubAccount.name,
-          balance: editingSubAccount.balance,
+          balance: parseFloat(editingSubAccount.balance) || 0,
         },
       }));
       setShowEditSubAccountModal(false);
@@ -480,12 +480,22 @@ const Accounts: React.FC = () => {
               <div>
                 <label className="block text-sm text-midnight-400 mb-2">Initial Balance</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={newSubAccount.balance}
-                  onChange={(e) => setNewSubAccount({ ...newSubAccount, balance: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                      setNewSubAccount({ ...newSubAccount, balance: val });
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      setNewSubAccount({ ...newSubAccount, balance: '' });
+                    }
+                  }}
                   className="input-field"
-                  placeholder="0.00"
-                  step="0.01"
+                  placeholder="Enter amount"
                 />
               </div>
 
@@ -557,12 +567,22 @@ const Accounts: React.FC = () => {
               <div>
                 <label className="block text-sm text-midnight-400 mb-2">Balance</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={editingSubAccount.balance}
-                  onChange={(e) => setEditingSubAccount({ ...editingSubAccount, balance: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                      setEditingSubAccount({ ...editingSubAccount, balance: val });
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      setEditingSubAccount({ ...editingSubAccount, balance: '' });
+                    }
+                  }}
                   className="input-field"
-                  placeholder="0.00"
-                  step="0.01"
+                  placeholder="Enter amount"
                 />
               </div>
             </div>
