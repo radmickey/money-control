@@ -112,6 +112,7 @@ export const updateTransaction = createAsyncThunk(
         category: data.category,
         description: data.description,
         date: data.date,
+        currency: data.currency,
       });
       const respData = extractData(response);
       return mapTransaction(respData);
