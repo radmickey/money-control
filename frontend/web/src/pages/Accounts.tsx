@@ -186,6 +186,25 @@ const Accounts: React.FC = () => {
     return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
   };
 
+  // Determine the display currency for total balance
+  const getDisplayCurrency = (account: any): { currency: string; mixed: boolean } => {
+    const subAccounts = account.subAccounts || [];
+    if (subAccounts.length === 0) {
+      return { currency: account.currency || 'USD', mixed: false };
+    }
+    const currencies = new Set(subAccounts.map((s: any) => s.currency));
+    if (currencies.size === 1) {
+      return { currency: subAccounts[0].currency, mixed: false };
+    }
+    return { currency: account.currency || 'USD', mixed: true };
+  };
+
+  // Calculate actual total from sub-accounts
+  const calculateTotal = (account: any): number => {
+    const subAccounts = account.subAccounts || [];
+    return subAccounts.reduce((sum: number, s: any) => sum + (s.balance || 0), 0);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -266,9 +285,20 @@ const Accounts: React.FC = () => {
 
                 <div className="pt-4 border-t border-midnight-800/50">
                   <p className="text-sm text-midnight-400">Total Balance</p>
-                  <p className="text-2xl font-semibold mt-1">
-                    {formatCurrency(account.totalBalance, account.currency)}
-                  </p>
+                  {(() => {
+                    const { currency, mixed } = getDisplayCurrency(account);
+                    const total = calculateTotal(account);
+                    return (
+                      <div>
+                        <p className="text-2xl font-semibold mt-1">
+                          {mixed ? '~' : ''}{formatCurrency(total || account.totalBalance, currency)}
+                        </p>
+                        {mixed && (
+                          <p className="text-xs text-midnight-500 mt-1">Mixed currencies</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Sub-accounts section */}
