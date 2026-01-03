@@ -341,7 +341,7 @@ const Dashboard: React.FC = () => {
                 <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-midnight-900/30">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      txType === 'income' ? 'bg-accent-emerald/20' : 
+                      txType === 'income' ? 'bg-accent-emerald/20' :
                       txType === 'transfer' ? 'bg-accent-amber/20' : 'bg-accent-coral/20'
                     }`}>
                       {txType === 'income' ? (

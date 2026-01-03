@@ -6,11 +6,12 @@ import {
   ArrowDownRight,
   ArrowLeftRight,
   Search,
-  Filter,
-  Calendar,
+  Edit,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchTransactions, createTransaction, setFilters } from '../store/slices/transactionsSlice';
+import { fetchTransactions, createTransaction, updateTransaction, deleteTransaction, setFilters } from '../store/slices/transactionsSlice';
 
 const categories = [
   'Food & Dining',
@@ -47,21 +48,34 @@ const categoryMap: { [key: number]: string } = {
   9: 'Other',
 };
 
+interface TransactionForm {
+  amount: string;
+  type: string;
+  category: string;
+  description: string;
+  date: string;
+  currency: string;
+}
+
+const defaultForm: TransactionForm = {
+  amount: '',
+  type: 'expense',
+  category: 'Other',
+  description: '',
+  date: new Date().toISOString().split('T')[0],
+  currency: 'USD',
+};
+
 const Transactions: React.FC = () => {
   const dispatch = useAppDispatch();
   const { transactions, filters, pagination, loading } = useAppSelector(
     (state) => state.transactions
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<{ id: string; form: TransactionForm } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [newTransaction, setNewTransaction] = useState({
-    amount: '',
-    type: 'expense',
-    category: 'Other',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-    currency: 'USD',
-  });
+  const [newTransaction, setNewTransaction] = useState<TransactionForm>(defaultForm);
 
   useEffect(() => {
     dispatch(fetchTransactions({ ...filters, page: pagination.page }));
@@ -75,14 +89,53 @@ const Transactions: React.FC = () => {
       })
     );
     setShowCreateModal(false);
-    setNewTransaction({
-      amount: '',
-      type: 'expense',
-      category: 'Other',
-      description: '',
-      date: new Date().toISOString().split('T')[0],
-      currency: 'USD',
+    setNewTransaction(defaultForm);
+  };
+
+  const handleEditClick = (transaction: any) => {
+    const txType = getTransactionType(transaction.type);
+    const txCategory = getTransactionCategory(transaction.category);
+    let dateStr = '';
+    if (typeof transaction.date === 'object' && transaction.date.seconds) {
+      dateStr = new Date(transaction.date.seconds * 1000).toISOString().split('T')[0];
+    } else if (typeof transaction.date === 'string') {
+      dateStr = transaction.date.split('T')[0];
+    }
+    
+    setEditingTransaction({
+      id: transaction.id,
+      form: {
+        amount: String(transaction.amount || 0),
+        type: txType,
+        category: txCategory,
+        description: transaction.description || '',
+        date: dateStr,
+        currency: transaction.currency || 'USD',
+      },
     });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTransaction = async () => {
+    if (editingTransaction) {
+      await dispatch(
+        updateTransaction({
+          id: editingTransaction.id,
+          data: {
+            ...editingTransaction.form,
+            amount: parseFloat(editingTransaction.form.amount),
+          },
+        })
+      );
+      setShowEditModal(false);
+      setEditingTransaction(null);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      await dispatch(deleteTransaction(id));
+    }
   };
 
   const formatCurrency = (value: number, currency: string = 'USD') => {
@@ -239,7 +292,7 @@ const Transactions: React.FC = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.02 * index }}
-                className="p-4 hover:bg-midnight-800/20 transition-colors flex items-center gap-4"
+                className="p-4 hover:bg-midnight-800/20 transition-colors flex items-center gap-4 group"
               >
                 <div className="w-10 h-10 rounded-xl bg-midnight-800/50 flex items-center justify-center">
                   {getTypeIcon(transaction.type)}
@@ -250,7 +303,7 @@ const Transactions: React.FC = () => {
                   <p className="text-sm text-midnight-400">{getTransactionCategory(transaction.category)}</p>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right mr-2">
                   <p
                     className={`font-semibold ${
                       getTransactionType(transaction.type) === 'income'
@@ -264,6 +317,23 @@ const Transactions: React.FC = () => {
                     {formatCurrency(transaction.amount, transaction.currency)}
                   </p>
                   <p className="text-sm text-midnight-400">{formatDate(transaction.date)}</p>
+                </div>
+
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <button
+                    onClick={() => handleEditClick(transaction)}
+                    className="p-2 text-midnight-400 hover:text-white hover:bg-midnight-700/50 rounded-lg transition-colors"
+                    title="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTransaction(transaction.id)}
+                    className="p-2 text-midnight-400 hover:text-accent-coral hover:bg-midnight-700/50 rounded-lg transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -386,6 +456,143 @@ const Transactions: React.FC = () => {
                 className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingTransaction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass rounded-2xl p-6 w-full max-w-md"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Edit Transaction</h3>
+              <button
+                onClick={() => { setShowEditModal(false); setEditingTransaction(null); }}
+                className="p-2 text-midnight-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                {['expense', 'income', 'transfer'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setEditingTransaction({
+                      ...editingTransaction,
+                      form: { ...editingTransaction.form, type }
+                    })}
+                    className={`flex-1 py-2 rounded-lg capitalize transition-colors ${
+                      editingTransaction.form.type === type
+                        ? 'bg-midnight-500 text-white'
+                        : 'bg-midnight-800/50 text-midnight-400 hover:text-white'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Amount</label>
+                  <input
+                    type="number"
+                    value={editingTransaction.form.amount}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      form: { ...editingTransaction.form, amount: e.target.value }
+                    })}
+                    className="input-field"
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-midnight-400 mb-2">Currency</label>
+                  <select
+                    value={editingTransaction.form.currency}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      form: { ...editingTransaction.form, currency: e.target.value }
+                    })}
+                    className="input-field"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="JPY">JPY</option>
+                    <option value="RUB">RUB</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-midnight-400 mb-2">Description</label>
+                <input
+                  type="text"
+                  value={editingTransaction.form.description}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    form: { ...editingTransaction.form, description: e.target.value }
+                  })}
+                  className="input-field"
+                  placeholder="e.g., Coffee at Starbucks"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-midnight-400 mb-2">Category</label>
+                <select
+                  value={editingTransaction.form.category}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    form: { ...editingTransaction.form, category: e.target.value }
+                  })}
+                  className="input-field"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-midnight-400 mb-2">Date</label>
+                <input
+                  type="date"
+                  value={editingTransaction.form.date}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    form: { ...editingTransaction.form, date: e.target.value }
+                  })}
+                  className="input-field"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowEditModal(false); setEditingTransaction(null); }}
+                className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateTransaction}
+                disabled={!editingTransaction.form.amount || !editingTransaction.form.description}
+                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Changes
               </button>
             </div>
           </motion.div>
