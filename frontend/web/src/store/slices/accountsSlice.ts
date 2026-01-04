@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { accountsAPI } from '../../services/api';
+import { extractData, extractErrorMessage } from '../../utils/api-helpers';
 
 export interface SubAccount {
   id: string;
@@ -40,12 +41,6 @@ const initialState: AccountsState = {
   error: null,
 };
 
-// Helper to extract data from API response
-const extractData = (response: any) => {
-  const data = response.data?.data || response.data;
-  return data;
-};
-
 // Map API account to frontend Account type
 const mapApiAccount = (apiAccount: any): Account => ({
   id: apiAccount.id,
@@ -79,7 +74,7 @@ export const fetchAccounts = createAsyncThunk(
       const accounts = data?.accounts || data || [];
       return Array.isArray(accounts) ? accounts.map(mapApiAccount) : [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch accounts');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch accounts'));
     }
   }
 );
@@ -92,7 +87,7 @@ export const createAccount = createAsyncThunk(
       const data = extractData(response);
       return mapApiAccount(data);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to create account'));
     }
   }
 );
@@ -105,7 +100,7 @@ export const updateAccount = createAsyncThunk(
       const respData = extractData(response);
       return mapApiAccount(respData);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to update account'));
     }
   }
 );
@@ -117,7 +112,7 @@ export const deleteAccount = createAsyncThunk(
       await accountsAPI.delete(id);
       return id;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to delete account'));
     }
   }
 );
@@ -143,7 +138,7 @@ export const createSubAccount = createAsyncThunk(
         },
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create sub-account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to create sub-account'));
     }
   }
 );
@@ -165,7 +160,7 @@ export const updateSubAccount = createAsyncThunk(
         },
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update sub-account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to update sub-account'));
     }
   }
 );
@@ -177,7 +172,7 @@ export const deleteSubAccount = createAsyncThunk(
       await accountsAPI.deleteSubAccount(accountId, subAccountId);
       return { accountId, subAccountId };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete sub-account');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to delete sub-account'));
     }
   }
 );

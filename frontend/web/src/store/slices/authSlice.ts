@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from '../../services/api';
+import { extractErrorMessage } from '../../utils/api-helpers';
 
 interface User {
   id: string;
@@ -96,7 +97,7 @@ export const getProfile = createAsyncThunk(
         baseCurrency: data.base_currency || 'USD',
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to fetch profile');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch profile'));
     }
   }
 );
@@ -116,7 +117,7 @@ export const updateProfile = createAsyncThunk(
         baseCurrency: data.base_currency || 'USD',
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to update profile');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to update profile'));
     }
   }
 );

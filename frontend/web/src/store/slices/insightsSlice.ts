@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { insightsAPI } from '../../services/api';
+import { extractErrorMessage } from '../../utils/api-helpers';
 
 export interface NetWorth {
   total: number;
@@ -62,7 +63,7 @@ export const fetchNetWorth = createAsyncThunk(
         changePercent30d: data?.changePercent30d ?? data?.change_percent_30d ?? 0,
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch net worth');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch net worth'));
     }
   }
 );
@@ -76,7 +77,7 @@ export const fetchAllocation = createAsyncThunk(
       const allocations = data?.allocations || data || [];
       return Array.isArray(allocations) ? allocations : [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch allocation');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch allocation'));
     }
   }
 );
@@ -90,7 +91,7 @@ export const fetchTrends = createAsyncThunk(
       const trends = data?.trends || data || [];
       return Array.isArray(trends) ? trends : [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch trends');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch trends'));
     }
   }
 );

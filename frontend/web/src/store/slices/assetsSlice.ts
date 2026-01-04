@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { assetsAPI } from '../../services/api';
+import { extractData, extractErrorMessage } from '../../utils/api-helpers';
 
 export interface Asset {
   id: string;
@@ -31,11 +32,6 @@ const initialState: AssetsState = {
   error: null,
 };
 
-// Helper to extract data from API response
-const extractData = (response: any) => {
-  return response.data?.data || response.data;
-};
-
 // Map API asset to frontend Asset
 const mapAsset = (data: any): Asset => ({
   id: data.id,
@@ -60,7 +56,7 @@ export const fetchAssets = createAsyncThunk(
       const assets = data?.assets || data || [];
       return Array.isArray(assets) ? assets.map(mapAsset) : [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch assets');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch assets'));
     }
   }
 );
@@ -81,7 +77,7 @@ export const createAsset = createAsyncThunk(
       const data = extractData(response);
       return mapAsset(data);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create asset');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to create asset'));
     }
   }
 );
@@ -100,7 +96,7 @@ export const updateAsset = createAsyncThunk(
       const respData = extractData(response);
       return mapAsset(respData);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update asset');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to update asset'));
     }
   }
 );
@@ -112,7 +108,7 @@ export const deleteAsset = createAsyncThunk(
       await assetsAPI.delete(id);
       return id;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete asset');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to delete asset'));
     }
   }
 );
@@ -125,7 +121,7 @@ export const fetchAssetPrice = createAsyncThunk(
       const data = extractData(response);
       return { symbol, price: data?.price || 0 };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch price');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch price'));
     }
   }
 );

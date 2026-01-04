@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { transactionsAPI } from '../../services/api';
+import { extractData, extractErrorMessage } from '../../utils/api-helpers';
 
 export interface Transaction {
   id: string;
@@ -44,11 +45,6 @@ const initialState: TransactionsState = {
   error: null,
 };
 
-// Helper to extract data from API response
-const extractData = (response: any) => {
-  return response.data?.data || response.data;
-};
-
 // Map API transaction to frontend Transaction
 const mapTransaction = (data: any): Transaction => ({
   id: data.id,
@@ -75,7 +71,7 @@ export const fetchTransactions = createAsyncThunk(
         total: data?.total || 0,
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch transactions');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to fetch transactions'));
     }
   }
 );
@@ -97,7 +93,7 @@ export const createTransaction = createAsyncThunk(
       const data = extractData(response);
       return mapTransaction(data);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to create transaction');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to create transaction'));
     }
   }
 );
@@ -117,7 +113,7 @@ export const updateTransaction = createAsyncThunk(
       const respData = extractData(response);
       return mapTransaction(respData);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to update transaction');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to update transaction'));
     }
   }
 );
@@ -129,7 +125,7 @@ export const deleteTransaction = createAsyncThunk(
       await transactionsAPI.delete(id);
       return id;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to delete transaction');
+      return rejectWithValue(extractErrorMessage(error, 'Failed to delete transaction'));
     }
   }
 );
