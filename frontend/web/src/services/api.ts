@@ -118,10 +118,11 @@ export const assetsAPI = {
 
 // Currency API
 export const currencyAPI = {
-  getRate: (from: string, to: string) =>
-    api.get('/currency/rate', { params: { from, to } }),
-  convert: (from: string, to: string, amount: number) =>
-    api.post('/currency/convert', { from, to, amount }),
+  list: () => api.get('/currencies'),
+  getRates: (baseCurrency: string) => api.get(`/currencies/rates/${baseCurrency}`),
+  getRate: (from: string, to: string) => api.get(`/currencies/rate/${from}/${to}`),
+  convert: (amount: number, from: string, to: string) =>
+    api.post('/currencies/convert', { amount, from, to }),
 };
 
 // Insights API

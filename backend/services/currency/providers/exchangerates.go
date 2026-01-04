@@ -6,48 +6,44 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const (
-	exchangeRatesBaseURL = "https://api.exchangeratesapi.io/v1"
+	// frankfurter.app - Free, no API key required, ECB data
+	frankfurterBaseURL = "https://api.frankfurter.app"
 )
 
 // ExchangeRatesClient provides exchange rate data
 type ExchangeRatesClient struct {
-	apiKey     string
 	httpClient *http.Client
 	baseURL    string
 }
 
 // NewExchangeRatesClient creates a new exchange rates client
+// apiKey parameter kept for compatibility but not used with frankfurter.app
 func NewExchangeRatesClient(apiKey string) *ExchangeRatesClient {
 	return &ExchangeRatesClient{
-		apiKey:  apiKey,
-		baseURL: exchangeRatesBaseURL,
+		baseURL: frankfurterBaseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
-// LatestRatesResponse represents the API response for latest rates
-type LatestRatesResponse struct {
-	Success   bool               `json:"success"`
-	Timestamp int64              `json:"timestamp"`
-	Base      string             `json:"base"`
-	Date      string             `json:"date"`
-	Rates     map[string]float64 `json:"rates"`
-	Error     *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
+// FrankfurterResponse represents the API response
+type FrankfurterResponse struct {
+	Amount float64            `json:"amount"`
+	Base   string             `json:"base"`
+	Date   string             `json:"date"`
+	Rates  map[string]float64 `json:"rates"`
 }
 
 // GetLatestRates gets the latest exchange rates for a base currency
 func (c *ExchangeRatesClient) GetLatestRates(ctx context.Context, baseCurrency string) (map[string]float64, error) {
-	url := fmt.Sprintf("%s/latest?access_key=%s&base=%s",
-		c.baseURL, c.apiKey, baseCurrency)
+	// frankfurter.app supports: USD, EUR, GBP, JPY, etc.
+	url := fmt.Sprintf("%s/latest?from=%s", c.baseURL, strings.ToUpper(baseCurrency))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -60,33 +56,63 @@ func (c *ExchangeRatesClient) GetLatestRates(ctx context.Context, baseCurrency s
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var result LatestRatesResponse
+	var result FrankfurterResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Free tier only supports EUR as base
-	// If different base requested, we need to convert
-	if result.Base != baseCurrency && len(result.Rates) > 0 {
-		return c.convertToBase(result.Rates, result.Base, baseCurrency), nil
+	// Add the base currency itself with rate 1.0
+	rates := result.Rates
+	if rates == nil {
+		rates = make(map[string]float64)
 	}
+	rates[strings.ToUpper(baseCurrency)] = 1.0
 
-	return result.Rates, nil
+	return rates, nil
 }
 
 // GetRate gets exchange rate between two currencies
 func (c *ExchangeRatesClient) GetRate(ctx context.Context, from, to string) (float64, error) {
-	rates, err := c.GetLatestRates(ctx, from)
+	url := fmt.Sprintf("%s/latest?from=%s&to=%s",
+		c.baseURL, strings.ToUpper(from), strings.ToUpper(to))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	rate, ok := rates[to]
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch rate: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result FrankfurterResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	rate, ok := result.Rates[strings.ToUpper(to)]
 	if !ok {
 		return 0, fmt.Errorf("rate not found for %s to %s", from, to)
 	}
@@ -94,21 +120,10 @@ func (c *ExchangeRatesClient) GetRate(ctx context.Context, from, to string) (flo
 	return rate, nil
 }
 
-// HistoricalRatesResponse represents historical rates response
-type HistoricalRatesResponse struct {
-	Success    bool               `json:"success"`
-	Historical bool               `json:"historical"`
-	Date       string             `json:"date"`
-	Timestamp  int64              `json:"timestamp"`
-	Base       string             `json:"base"`
-	Rates      map[string]float64 `json:"rates"`
-}
-
 // GetHistoricalRates gets historical rates for a specific date
 func (c *ExchangeRatesClient) GetHistoricalRates(ctx context.Context, baseCurrency string, date time.Time) (map[string]float64, error) {
 	dateStr := date.Format("2006-01-02")
-	url := fmt.Sprintf("%s/%s?access_key=%s&base=%s",
-		c.baseURL, dateStr, c.apiKey, baseCurrency)
+	url := fmt.Sprintf("%s/%s?from=%s", c.baseURL, dateStr, strings.ToUpper(baseCurrency))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -121,42 +136,28 @@ func (c *ExchangeRatesClient) GetHistoricalRates(ctx context.Context, baseCurren
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var result HistoricalRatesResponse
+	var result FrankfurterResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if result.Base != baseCurrency && len(result.Rates) > 0 {
-		return c.convertToBase(result.Rates, result.Base, baseCurrency), nil
+	rates := result.Rates
+	if rates == nil {
+		rates = make(map[string]float64)
 	}
+	rates[strings.ToUpper(baseCurrency)] = 1.0
 
-	return result.Rates, nil
-}
-
-// convertToBase converts rates from one base currency to another
-func (c *ExchangeRatesClient) convertToBase(rates map[string]float64, currentBase, newBase string) map[string]float64 {
-	// Get the rate of the new base in terms of current base
-	newBaseRate, ok := rates[newBase]
-	if !ok || newBaseRate == 0 {
-		return rates
-	}
-
-	converted := make(map[string]float64)
-	for currency, rate := range rates {
-		if currency == newBase {
-			converted[currentBase] = 1 / newBaseRate
-		} else {
-			converted[currency] = rate / newBaseRate
-		}
-	}
-	converted[currentBase] = 1 / newBaseRate
-
-	return converted
+	return rates, nil
 }
 
 // ConvertAmount converts an amount from one currency to another
@@ -168,4 +169,3 @@ func (c *ExchangeRatesClient) ConvertAmount(ctx context.Context, amount float64,
 
 	return amount * rate, rate, nil
 }
-

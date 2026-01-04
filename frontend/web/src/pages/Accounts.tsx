@@ -17,6 +17,16 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchAccounts, createAccount, updateAccount, deleteAccount, createSubAccount, updateSubAccount, deleteSubAccount } from '../store/slices/accountsSlice';
+import { currencyAPI } from '../services/api';
+
+// Fallback exchange rates (approximate) if API is unavailable
+const FALLBACK_RATES: { [key: string]: number } = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  JPY: 149.5,
+  RUB: 89.5,
+};
 
 const accountTypeIcons: { [key: string]: React.ElementType } = {
   bank: Building2,
@@ -48,9 +58,21 @@ const Accounts: React.FC = () => {
     balance: '',
     currency: 'USD',
   });
+  const [exchangeRates, setExchangeRates] = useState<{ [key: string]: number }>(FALLBACK_RATES);
 
   useEffect(() => {
     dispatch(fetchAccounts());
+    // Load exchange rates
+    currencyAPI.getRates('USD')
+      .then((res) => {
+        if (res.data?.data?.rates) {
+          setExchangeRates({ USD: 1, ...res.data.data.rates });
+        }
+      })
+      .catch(() => {
+        // Use fallback rates if API fails
+        console.log('Using fallback exchange rates');
+      });
   }, [dispatch]);
 
   const toggleExpand = (accountId: string) => {
@@ -186,23 +208,49 @@ const Accounts: React.FC = () => {
     return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
   };
 
+  // Convert amount from one currency to another using exchange rates
+  const convertCurrency = (amount: number, from: string, to: string): number => {
+    if (from === to) return amount;
+    
+    // Get rate relative to USD
+    const fromRate = exchangeRates[from] || FALLBACK_RATES[from] || 1;
+    const toRate = exchangeRates[to] || FALLBACK_RATES[to] || 1;
+    
+    // Convert: amount -> USD -> target currency
+    const inUSD = amount / fromRate;
+    return inUSD * toRate;
+  };
+
   // Determine the display currency for total balance
+  // Always use account's base currency for total, since we convert all sub-accounts to it
   const getDisplayCurrency = (account: any): { currency: string; mixed: boolean } => {
     const subAccounts = account.subAccounts || [];
     if (subAccounts.length === 0) {
       return { currency: account.currency || 'USD', mixed: false };
     }
     const currencies = new Set(subAccounts.map((s: any) => s.currency));
-    if (currencies.size === 1) {
-      return { currency: subAccounts[0].currency, mixed: false };
+    const accountCurrency = account.currency || 'USD';
+    
+    // Check if all sub-accounts are in account's currency
+    if (currencies.size === 1 && currencies.has(accountCurrency)) {
+      return { currency: accountCurrency, mixed: false };
     }
-    return { currency: account.currency || 'USD', mixed: true };
+    
+    // If any sub-account has different currency, we're converting
+    return { currency: accountCurrency, mixed: currencies.size > 1 || !currencies.has(accountCurrency) };
   };
 
-  // Calculate actual total from sub-accounts
+  // Calculate actual total from sub-accounts with currency conversion
   const calculateTotal = (account: any): number => {
     const subAccounts = account.subAccounts || [];
-    return subAccounts.reduce((sum: number, s: any) => sum + (s.balance || 0), 0);
+    const targetCurrency = account.currency || 'USD';
+    
+    return subAccounts.reduce((sum: number, s: any) => {
+      const balance = s.balance || 0;
+      const subCurrency = s.currency || targetCurrency;
+      const converted = convertCurrency(balance, subCurrency, targetCurrency);
+      return sum + converted;
+    }, 0);
   };
 
   return (

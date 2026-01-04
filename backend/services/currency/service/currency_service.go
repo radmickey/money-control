@@ -22,6 +22,7 @@ type CurrencyService struct {
 	rateRepo         *repository.ExchangeRateRepository
 	historyRepo      *repository.RateHistoryRepository
 	ratesClient      *providers.ExchangeRatesClient
+	cbrClient        *providers.CBRClient
 	cache            *cache.Cache
 	updateTicker     *time.Ticker
 	stopChan         chan struct{}
@@ -47,6 +48,7 @@ func NewCurrencyService(
 		rateRepo:     rateRepo,
 		historyRepo:  historyRepo,
 		ratesClient:  ratesClient,
+		cbrClient:    providers.NewCBRClient(),
 		cache:        redisCache,
 		defaultBase:  defaultBase,
 		stopChan:     make(chan struct{}),
@@ -131,7 +133,11 @@ func (s *CurrencyService) GetMultipleExchangeRates(ctx context.Context, baseCurr
 	// Check cache
 	cacheKey := cache.ExchangeRatesKey(baseCurrency)
 	var cachedRates map[string]float64
-	if err := s.cache.Get(ctx, cacheKey, &cachedRates); err == nil {
+	if err := s.cache.Get(ctx, cacheKey, &cachedRates); err == nil && len(cachedRates) > 0 {
+		// If no specific currencies requested, return all
+		if len(targetCurrencies) == 0 {
+			return cachedRates, time.Now(), nil
+		}
 		// Filter to requested currencies
 		result := make(map[string]float64)
 		for _, currency := range targetCurrencies {
@@ -149,7 +155,9 @@ func (s *CurrencyService) GetMultipleExchangeRates(ctx context.Context, baseCurr
 	}
 
 	// Cache all rates
-	_ = s.cache.Set(ctx, cacheKey, allRates, rateCacheTTL)
+	if len(allRates) > 0 {
+		_ = s.cache.Set(ctx, cacheKey, allRates, rateCacheTTL)
+	}
 
 	// Filter to requested currencies
 	if len(targetCurrencies) > 0 {
@@ -218,9 +226,15 @@ func (s *CurrencyService) RefreshRates(ctx context.Context, baseCurrency string)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Get rates from frankfurter.app (ECB data)
 	rates, err := s.ratesClient.GetLatestRates(ctx, baseCurrency)
 	if err != nil {
 		return 0, err
+	}
+
+	// Get RUB rate from Central Bank of Russia
+	if err := s.addCBRRates(ctx, rates, baseCurrency); err != nil {
+		log.Printf("Warning: Failed to get CBR rates: %v", err)
 	}
 
 	// Save to database
@@ -238,6 +252,29 @@ func (s *CurrencyService) RefreshRates(ctx context.Context, baseCurrency string)
 	log.Printf("Updated %d exchange rates for base %s", len(rates), baseCurrency)
 
 	return len(rates), nil
+}
+
+// addCBRRates adds RUB and CIS currencies from Central Bank of Russia
+func (s *CurrencyService) addCBRRates(ctx context.Context, rates map[string]float64, baseCurrency string) error {
+	// Get USD/RUB rate from CBR
+	usdRubRate, err := s.cbrClient.GetUSDRUBRate(ctx)
+	if err != nil {
+		return err
+	}
+
+	// If base is USD, RUB rate is direct
+	if baseCurrency == "USD" {
+		rates["RUB"] = usdRubRate
+	} else {
+		// Convert via USD
+		usdRate, hasUSD := rates["USD"]
+		if hasUSD && usdRate > 0 {
+			// Rate of RUB in terms of baseCurrency
+			rates["RUB"] = usdRubRate * usdRate
+		}
+	}
+
+	return nil
 }
 
 // GetLastUpdateTime gets the last update time for rates
