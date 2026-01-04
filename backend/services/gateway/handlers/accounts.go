@@ -1,15 +1,22 @@
 package handlers
 
 import (
+	"context"
 	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/radmickey/money-control/backend/pkg/converters"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
+	"github.com/radmickey/money-control/backend/pkg/resilience"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
 	currencypb "github.com/radmickey/money-control/backend/proto/currency"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
+)
+
+const (
+	serviceAccounts = "accounts-service"
+	serviceCurrency = "currency-service"
 )
 
 // AccountsHandler handles accounts-related requests
@@ -39,14 +46,18 @@ func (h *AccountsHandler) CreateAccount(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.proxy.Accounts.CreateAccount(c.Request.Context(), &accountspb.CreateAccountRequest{
-		UserId:      userID,
-		Name:        req.Name,
-		Type:        converters.StringToAccountType(req.Type),
-		Currency:    converters.DefaultCurrency(req.Currency),
-		Description: req.Description,
-		Icon:        req.Icon,
-	})
+	// Call with circuit breaker and timeout
+	resp, err := resilience.Call(c.Request.Context(), resilience.DefaultCallOptions(serviceAccounts),
+		func(ctx context.Context) (*accountspb.Account, error) {
+			return h.proxy.Accounts.CreateAccount(ctx, &accountspb.CreateAccountRequest{
+				UserId:      userID,
+				Name:        req.Name,
+				Type:        converters.StringToAccountType(req.Type),
+				Currency:    converters.DefaultCurrency(req.Currency),
+				Description: req.Description,
+				Icon:        req.Icon,
+			})
+		})
 	if err != nil {
 		utils.InternalError(c, err.Error())
 		return

@@ -1,8 +1,11 @@
 package proxy
 
 import (
+	"time"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
 	assetspb "github.com/radmickey/money-control/backend/proto/assets"
@@ -11,6 +14,36 @@ import (
 	insightspb "github.com/radmickey/money-control/backend/proto/insights"
 	transactionspb "github.com/radmickey/money-control/backend/proto/transactions"
 )
+
+// Default timeouts and retry configuration
+const (
+	DefaultConnectTimeout = 5 * time.Second
+	DefaultRequestTimeout = 10 * time.Second
+	MaxRetryAttempts      = 3
+)
+
+// Retry policy for gRPC calls - handles transient failures
+var retryPolicy = `{
+	"methodConfig": [{
+		"name": [{"service": ""}],
+		"waitForReady": true,
+		"timeout": "10s",
+		"retryPolicy": {
+			"maxAttempts": 3,
+			"initialBackoff": "0.1s",
+			"maxBackoff": "1s",
+			"backoffMultiplier": 2.0,
+			"retryableStatusCodes": ["UNAVAILABLE", "DEADLINE_EXCEEDED", "RESOURCE_EXHAUSTED"]
+		}
+	}]
+}`
+
+// Keepalive parameters to maintain connection health
+var keepaliveParams = keepalive.ClientParameters{
+	Time:                10 * time.Second, // Ping server every 10s if no activity
+	Timeout:             3 * time.Second,  // Wait 3s for ping ack
+	PermitWithoutStream: true,             // Allow pings even without active streams
+}
 
 // Config holds service proxy configuration
 type Config struct {
@@ -34,14 +67,19 @@ type ServiceProxy struct {
 	Insights     insightspb.InsightsServiceClient
 }
 
-// NewServiceProxy creates a new service proxy
+// NewServiceProxy creates a new service proxy with resilient connections
 func NewServiceProxy(cfg Config) (*ServiceProxy, error) {
 	sp := &ServiceProxy{
 		connections: make([]*grpc.ClientConn, 0),
 	}
 
+	// Common dial options for all connections
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(retryPolicy),
+		grpc.WithKeepaliveParams(keepaliveParams),
+		// Connection pooling via round-robin when multiple backends available
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`),
 	}
 
 	// Connect to Auth service
@@ -113,4 +151,3 @@ func (sp *ServiceProxy) Close() {
 		conn.Close()
 	}
 }
-

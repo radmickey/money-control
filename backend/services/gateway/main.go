@@ -13,10 +13,14 @@ import (
 	"github.com/radmickey/money-control/backend/pkg/auth"
 	"github.com/radmickey/money-control/backend/pkg/cache"
 	"github.com/radmickey/money-control/backend/pkg/config"
+	"github.com/radmickey/money-control/backend/pkg/health"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
+	"github.com/radmickey/money-control/backend/pkg/resilience"
 	"github.com/radmickey/money-control/backend/services/gateway/handlers"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
 )
+
+const version = "1.0.0"
 
 func main() {
 	// Load configuration
@@ -24,6 +28,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	// Initialize health checker
+	healthChecker := health.NewHealthChecker(version)
 
 	// Initialize JWT manager
 	jwtManager := auth.NewJWTManager(
@@ -39,7 +46,7 @@ func main() {
 		cfg.GoogleRedirectURL,
 	)
 
-	// Initialize gRPC service proxies (with lazy connection)
+	// Initialize gRPC service proxies (with retry policy and keepalive)
 	serviceProxy, err := proxy.NewServiceProxy(proxy.Config{
 		AuthServiceURL:         cfg.AuthServiceURL,
 		AccountsServiceURL:     cfg.AccountsServiceURL,
@@ -69,6 +76,11 @@ func main() {
 		} else {
 			defer redisCache.Close()
 			rateLimiter = middleware.NewRateLimiter(redisCache.Client(), "gateway")
+
+			// Register Redis health check
+			healthChecker.Register("redis", health.RedisCheck(func(ctx context.Context) error {
+				return redisCache.Client().Ping(ctx).Err()
+			}))
 		}
 	}
 
@@ -93,14 +105,8 @@ func main() {
 		}))
 	}
 
-	// Health check
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
-			"service": "gateway",
-			"redis":   redisCache != nil,
-		})
-	})
+	// Health endpoints
+	registerHealthEndpoints(router, healthChecker, redisCache)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -118,7 +124,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("API Gateway starting on port %s", cfg.HTTPPort)
+		log.Printf("API Gateway v%s starting on port %s", version, cfg.HTTPPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start HTTP server: %v", err)
 		}
@@ -140,4 +146,49 @@ func main() {
 	}
 
 	log.Println("Gateway stopped")
+}
+
+// registerHealthEndpoints registers health check endpoints
+func registerHealthEndpoints(router *gin.Engine, healthChecker *health.HealthChecker, redisCache *cache.Cache) {
+	// Basic health check (liveness probe)
+	router.GET("/health", func(c *gin.Context) {
+		check := healthChecker.Liveness(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{
+			"status":    check.Status,
+			"service":   "gateway",
+			"version":   version,
+			"timestamp": check.Timestamp,
+		})
+	})
+
+	// Readiness probe - checks all dependencies
+	router.GET("/ready", func(c *gin.Context) {
+		report := healthChecker.Readiness(c.Request.Context())
+
+		statusCode := http.StatusOK
+		if report.Status != health.StatusUp {
+			statusCode = http.StatusServiceUnavailable
+		}
+
+		c.JSON(statusCode, report)
+	})
+
+	// Detailed health check
+	router.GET("/health/details", func(c *gin.Context) {
+		report := healthChecker.Check(c.Request.Context())
+
+		// Add circuit breaker stats
+		cbStats := resilience.GlobalManager.AllStats()
+
+		c.JSON(http.StatusOK, gin.H{
+			"health":           report,
+			"circuit_breakers": cbStats,
+		})
+	})
+
+	// Circuit breaker status endpoint
+	router.GET("/health/circuits", func(c *gin.Context) {
+		stats := resilience.GlobalManager.AllStats()
+		c.JSON(http.StatusOK, stats)
+	})
 }
