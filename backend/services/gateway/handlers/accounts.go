@@ -102,7 +102,12 @@ type SubAccountWithConverted struct {
 func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
 	accountType := c.Query("type")
-	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
+	// Support both "currency" and "baseCurrency" query params
+	baseCurrency := c.Query("baseCurrency")
+	if baseCurrency == "" {
+		baseCurrency = c.Query("currency")
+	}
+	baseCurrency = converters.DefaultCurrency(baseCurrency)
 
 	// Get accounts
 	resp, err := h.proxy.Accounts.ListAccounts(c.Request.Context(), &accountspb.ListAccountsRequest{
