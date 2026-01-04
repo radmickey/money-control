@@ -130,47 +130,61 @@ func (s *CurrencyService) GetExchangeRate(ctx context.Context, from, to string) 
 
 // GetMultipleExchangeRates gets exchange rates for multiple currencies
 func (s *CurrencyService) GetMultipleExchangeRates(ctx context.Context, baseCurrency string, targetCurrencies []string) (map[string]float64, time.Time, error) {
-	// Check cache
-	cacheKey := cache.ExchangeRatesKey(baseCurrency)
-	var cachedRates map[string]float64
-	if err := s.cache.Get(ctx, cacheKey, &cachedRates); err == nil && len(cachedRates) > 0 {
-		// If no specific currencies requested, return all
-		if len(targetCurrencies) == 0 {
-			return cachedRates, time.Now(), nil
+	// Always get rates from USD (our canonical base) and convert if needed
+	cacheKey := cache.ExchangeRatesKey(s.defaultBase)
+	var usdRates map[string]float64
+	if err := s.cache.Get(ctx, cacheKey, &usdRates); err != nil || len(usdRates) == 0 {
+		// Get from database
+		var lastUpdate time.Time
+		var err error
+		usdRates, lastUpdate, err = s.rateRepo.GetRatesForBase(ctx, s.defaultBase)
+		if err != nil || len(usdRates) == 0 {
+			return nil, lastUpdate, err
 		}
-		// Filter to requested currencies
-		result := make(map[string]float64)
-		for _, currency := range targetCurrencies {
-			if rate, ok := cachedRates[currency]; ok {
-				result[currency] = rate
-			}
+		// Cache USD rates
+		_ = s.cache.Set(ctx, cacheKey, usdRates, rateCacheTTL)
+	}
+
+	// Add USD = 1 to the rates map
+	usdRates[s.defaultBase] = 1.0
+
+	// If base is USD, return directly
+	if baseCurrency == s.defaultBase {
+		return s.filterRates(usdRates, targetCurrencies), time.Now(), nil
+	}
+
+	// Convert rates to requested base currency
+	baseRate, ok := usdRates[baseCurrency]
+	if !ok || baseRate == 0 {
+		// Unknown base currency, return empty
+		return nil, time.Now(), nil
+	}
+
+	// Recalculate all rates relative to new base
+	convertedRates := make(map[string]float64)
+	for currency, usdRate := range usdRates {
+		// Rate of currency in terms of baseCurrency
+		// If USD/EUR = 0.85, then EUR/USD = 1/0.85 = 1.17
+		// And EUR/GBP = USD/GBP / USD/EUR
+		convertedRates[currency] = usdRate / baseRate
+	}
+	convertedRates[baseCurrency] = 1.0
+
+	return s.filterRates(convertedRates, targetCurrencies), time.Now(), nil
+}
+
+// filterRates filters rates to only requested currencies
+func (s *CurrencyService) filterRates(rates map[string]float64, targetCurrencies []string) map[string]float64 {
+	if len(targetCurrencies) == 0 {
+		return rates
+	}
+	result := make(map[string]float64)
+	for _, currency := range targetCurrencies {
+		if rate, ok := rates[currency]; ok {
+			result[currency] = rate
 		}
-		return result, time.Now(), nil
 	}
-
-	// Get from database
-	allRates, lastUpdate, err := s.rateRepo.GetRatesForBase(ctx, baseCurrency)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-
-	// Cache all rates
-	if len(allRates) > 0 {
-		_ = s.cache.Set(ctx, cacheKey, allRates, rateCacheTTL)
-	}
-
-	// Filter to requested currencies
-	if len(targetCurrencies) > 0 {
-		result := make(map[string]float64)
-		for _, currency := range targetCurrencies {
-			if rate, ok := allRates[currency]; ok {
-				result[currency] = rate
-			}
-		}
-		return result, lastUpdate, nil
-	}
-
-	return allRates, lastUpdate, nil
+	return result
 }
 
 // ConvertAmount converts an amount from one currency to another
