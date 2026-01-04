@@ -18,6 +18,8 @@ import Modal, { FormField, CancelButton, SubmitButton, CurrencySelect } from '..
 const Accounts: React.FC = () => {
   const dispatch = useAppDispatch();
   const { accounts, loading } = useAppSelector((state) => state.accounts);
+  const { user } = useAppSelector((state) => state.auth);
+  const baseCurrency = user?.baseCurrency || 'USD';
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSubAccountModal, setShowSubAccountModal] = useState(false);
@@ -38,8 +40,8 @@ const Accounts: React.FC = () => {
   });
 
   useEffect(() => {
-    dispatch(fetchAccounts());
-  }, [dispatch]);
+    dispatch(fetchAccounts(baseCurrency));
+  }, [dispatch, baseCurrency]);
 
   const toggleExpand = (accountId: string) => {
     setExpandedAccounts(prev => {

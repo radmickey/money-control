@@ -44,6 +44,8 @@ const Transactions: React.FC = () => {
     (state) => state.transactions
   );
   const { accounts } = useAppSelector((state) => state.accounts);
+  const { user } = useAppSelector((state) => state.auth);
+  const baseCurrency = user?.baseCurrency || 'USD';
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<{ id: string; form: TransactionForm } | null>(null);
@@ -51,8 +53,8 @@ const Transactions: React.FC = () => {
   const [newTransaction, setNewTransaction] = useState<TransactionForm>(defaultForm);
 
   useEffect(() => {
-    dispatch(fetchAccounts());
-  }, [dispatch]);
+    dispatch(fetchAccounts(baseCurrency));
+  }, [dispatch, baseCurrency]);
 
   useEffect(() => {
     dispatch(fetchTransactions({ ...filters, page: pagination.page }));

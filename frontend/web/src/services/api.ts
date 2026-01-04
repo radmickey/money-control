@@ -85,7 +85,7 @@ export const authAPI = {
 
 // Accounts API
 export const accountsAPI = {
-  list: () => api.get('/accounts'),
+  list: (baseCurrency?: string) => api.get('/accounts', { params: baseCurrency ? { baseCurrency } : {} }),
   get: (id: string) => api.get(`/accounts/${id}`),
   create: (data: any) => api.post('/accounts', data),
   update: (id: string, data: any) => api.put(`/accounts/${id}`, data),

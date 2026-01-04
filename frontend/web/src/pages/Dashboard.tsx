@@ -36,7 +36,7 @@ const Dashboard: React.FC = () => {
     dispatch(fetchNetWorth(baseCurrency));
     dispatch(fetchAllocation(baseCurrency));
     dispatch(fetchTrends({ baseCurrency, period: '30d' }));
-    dispatch(fetchAccounts());
+    dispatch(fetchAccounts(baseCurrency));
     dispatch(fetchAssets());
     dispatch(fetchTransactions({}));
   }, [dispatch, baseCurrency]);
@@ -51,7 +51,7 @@ const Dashboard: React.FC = () => {
     dispatch(fetchNetWorth(baseCurrency));
     dispatch(fetchAllocation(baseCurrency));
     dispatch(fetchTrends({ baseCurrency, period: '30d' }));
-    dispatch(fetchAccounts());
+    dispatch(fetchAccounts(baseCurrency));
     dispatch(fetchAssets());
     dispatch(fetchTransactions({}));
   };

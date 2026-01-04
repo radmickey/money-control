@@ -67,9 +67,9 @@ const mapApiAccount = (apiAccount: any): Account => ({
 
 export const fetchAccounts = createAsyncThunk(
   'accounts/fetchAccounts',
-  async (_, { rejectWithValue }) => {
+  async (baseCurrency: string | undefined, { rejectWithValue }) => {
     try {
-      const response = await accountsAPI.list();
+      const response = await accountsAPI.list(baseCurrency);
       const data = extractData(response);
       const accounts = data?.accounts || data || [];
       return Array.isArray(accounts) ? accounts.map(mapApiAccount) : [];
