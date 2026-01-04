@@ -46,10 +46,12 @@ const Settings: React.FC = () => {
   });
   const [saved, setSaved] = useState(false);
 
-  // Load user profile on mount
+  // Load user profile on mount (only if not already loaded)
   useEffect(() => {
-    dispatch(getProfile());
-  }, [dispatch]);
+    if (!user) {
+      dispatch(getProfile());
+    }
+  }, [dispatch, user]);
 
   // Sync formData with user when user changes
   useEffect(() => {

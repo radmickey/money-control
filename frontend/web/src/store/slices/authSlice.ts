@@ -213,11 +213,17 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload;
       })
-      .addCase(getProfile.rejected, (state) => {
+      .addCase(getProfile.rejected, (state, action) => {
         state.loading = false;
-        state.isAuthenticated = false;
-        state.token = null;
-        localStorage.removeItem('token');
+        // Only logout if it's an auth error (401), not other errors
+        const error = action.payload as string;
+        if (error?.includes('Unauthorized') || error?.includes('401') || error?.includes('token')) {
+          state.isAuthenticated = false;
+          state.token = null;
+          localStorage.removeItem('token');
+        }
+        // Otherwise just set error, don't logout
+        state.error = error || 'Failed to fetch profile';
       })
       // Update Profile
       .addCase(updateProfile.pending, (state) => {
