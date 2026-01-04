@@ -5,7 +5,9 @@ import (
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
+	currencypb "github.com/radmickey/money-control/backend/proto/currency"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
+	"log"
 )
 
 // AccountsHandler handles accounts-related requests
@@ -51,11 +53,47 @@ func (h *AccountsHandler) CreateAccount(c *gin.Context) {
 	utils.Created(c, resp)
 }
 
-// ListAccounts lists accounts
+// AccountWithConvertedBalance represents an account with converted total balance
+type AccountWithConvertedBalance struct {
+	ID                    string                   `json:"id"`
+	UserID                string                   `json:"user_id"`
+	Name                  string                   `json:"name"`
+	Type                  string                   `json:"type"`
+	Currency              string                   `json:"currency"`
+	Description           string                   `json:"description,omitempty"`
+	Icon                  string                   `json:"icon,omitempty"`
+	TotalBalance          float64                  `json:"total_balance"`
+	ConvertedTotalBalance float64                  `json:"converted_total_balance"`
+	DisplayCurrency       string                   `json:"display_currency"`
+	IsMixedCurrency       bool                     `json:"is_mixed_currency"`
+	SubAccounts           []SubAccountWithConverted `json:"subAccounts,omitempty"`
+	CreatedAt             string                   `json:"created_at"`
+	UpdatedAt             string                   `json:"updated_at"`
+}
+
+// SubAccountWithConverted represents a sub-account with converted balance
+type SubAccountWithConverted struct {
+	ID               string  `json:"id"`
+	AccountID        string  `json:"account_id"`
+	Name             string  `json:"name"`
+	Currency         string  `json:"currency"`
+	Balance          float64 `json:"balance"`
+	ConvertedBalance float64 `json:"converted_balance"`
+	Description      string  `json:"description,omitempty"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
+}
+
+// ListAccounts lists accounts with converted balances
 func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
 	accountType := c.Query("type")
+	baseCurrency := c.Query("currency")
+	if baseCurrency == "" {
+		baseCurrency = "USD"
+	}
 
+	// Get accounts
 	resp, err := h.proxy.Accounts.ListAccounts(c.Request.Context(), &accountspb.ListAccountsRequest{
 		UserId:   userID,
 		Type:     stringToAccountType(accountType),
@@ -67,10 +105,136 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 		return
 	}
 
-	utils.Success(c, gin.H{
-		"accounts": resp.Accounts,
-		"total":    resp.Total,
+	// Get exchange rates
+	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
+		BaseCurrency: baseCurrency,
 	})
+
+	rates := make(map[string]float64)
+	rates[baseCurrency] = 1.0
+	if err != nil {
+		log.Printf("Warning: Failed to get exchange rates: %v", err)
+	} else if ratesResp != nil {
+		for currency, rate := range ratesResp.Rates {
+			rates[currency] = rate
+		}
+	}
+
+	// Convert accounts
+	accounts := make([]AccountWithConvertedBalance, 0, len(resp.Accounts))
+	for _, acc := range resp.Accounts {
+		accountCurrency := acc.Currency
+		if accountCurrency == "" {
+			accountCurrency = "USD"
+		}
+
+		// Convert sub-accounts and calculate total
+		var convertedTotal float64
+		var isMixed bool
+		subAccounts := make([]SubAccountWithConverted, 0, len(acc.SubAccounts))
+
+		currencies := make(map[string]bool)
+		for _, sub := range acc.SubAccounts {
+			subCurrency := sub.Currency
+			if subCurrency == "" {
+				subCurrency = accountCurrency
+			}
+			currencies[subCurrency] = true
+
+			// Convert sub-account balance to account currency
+			convertedBalance := convertAmount(sub.Balance, subCurrency, accountCurrency, rates)
+			convertedTotal += convertedBalance
+
+			subAccounts = append(subAccounts, SubAccountWithConverted{
+				ID:               sub.Id,
+				AccountID:        sub.AccountId,
+				Name:             sub.Name,
+				Currency:         subCurrency,
+				Balance:          sub.Balance,
+				ConvertedBalance: convertedBalance,
+				Description:      sub.Description,
+				CreatedAt:        sub.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+				UpdatedAt:        sub.UpdatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+			})
+		}
+
+		// Check if mixed currencies
+		if len(currencies) > 1 || (len(currencies) == 1 && !currencies[accountCurrency]) {
+			isMixed = true
+		}
+
+		// Get account type string
+		accType := accountTypeToString(acc.Type)
+
+		accounts = append(accounts, AccountWithConvertedBalance{
+			ID:                    acc.Id,
+			UserID:                acc.UserId,
+			Name:                  acc.Name,
+			Type:                  accType,
+			Currency:              accountCurrency,
+			Description:           acc.Description,
+			Icon:                  acc.Icon,
+			TotalBalance:          acc.TotalBalance,
+			ConvertedTotalBalance: convertedTotal,
+			DisplayCurrency:       accountCurrency,
+			IsMixedCurrency:       isMixed,
+			SubAccounts:           subAccounts,
+			CreatedAt:             acc.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:             acc.UpdatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	utils.Success(c, gin.H{
+		"accounts":      accounts,
+		"total":         resp.Total,
+		"base_currency": baseCurrency,
+		"rates":         rates,
+	})
+}
+
+// convertAmount converts amount from one currency to another
+func convertAmount(amount float64, from, to string, rates map[string]float64) float64 {
+	if from == to {
+		return amount
+	}
+
+	fromRate := rates[from]
+	toRate := rates[to]
+
+	if fromRate == 0 {
+		fromRate = 1
+	}
+	if toRate == 0 {
+		toRate = 1
+	}
+
+	// Convert: amount in 'from' -> base currency -> 'to' currency
+	// rates are relative to base currency (e.g., USD)
+	// If base is USD: EUR rate = 0.85 means 1 USD = 0.85 EUR
+	// To convert EUR to USD: amount_EUR / 0.85 = amount_USD
+	// To convert USD to EUR: amount_USD * 0.85 = amount_EUR
+	inBase := amount / fromRate
+	return inBase * toRate
+}
+
+// accountTypeToString converts account type enum to string
+func accountTypeToString(t accountspb.AccountType) string {
+	switch t {
+	case accountspb.AccountType_ACCOUNT_TYPE_BANK:
+		return "bank"
+	case accountspb.AccountType_ACCOUNT_TYPE_CASH:
+		return "cash"
+	case accountspb.AccountType_ACCOUNT_TYPE_INVESTMENT:
+		return "investment"
+	case accountspb.AccountType_ACCOUNT_TYPE_CRYPTO:
+		return "crypto"
+	case accountspb.AccountType_ACCOUNT_TYPE_REAL_ESTATE:
+		return "real_estate"
+	case accountspb.AccountType_ACCOUNT_TYPE_OTHER:
+		return "other"
+	default:
+		return "other"
+	}
 }
 
 // GetAccount gets an account

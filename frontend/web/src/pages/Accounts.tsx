@@ -17,16 +17,6 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchAccounts, createAccount, updateAccount, deleteAccount, createSubAccount, updateSubAccount, deleteSubAccount } from '../store/slices/accountsSlice';
-import { currencyAPI } from '../services/api';
-
-// Fallback exchange rates (approximate) if API is unavailable
-const FALLBACK_RATES: { [key: string]: number } = {
-  USD: 1,
-  EUR: 0.92,
-  GBP: 0.79,
-  JPY: 149.5,
-  RUB: 89.5,
-};
 
 const accountTypeIcons: { [key: string]: React.ElementType } = {
   bank: Building2,
@@ -58,21 +48,9 @@ const Accounts: React.FC = () => {
     balance: '',
     currency: 'USD',
   });
-  const [exchangeRates, setExchangeRates] = useState<{ [key: string]: number }>(FALLBACK_RATES);
 
   useEffect(() => {
     dispatch(fetchAccounts());
-    // Load exchange rates
-    currencyAPI.getRates('USD')
-      .then((res) => {
-        if (res.data?.data?.rates) {
-          setExchangeRates({ USD: 1, ...res.data.data.rates });
-        }
-      })
-      .catch(() => {
-        // Use fallback rates if API fails
-        console.log('Using fallback exchange rates');
-      });
   }, [dispatch]);
 
   const toggleExpand = (accountId: string) => {
@@ -107,8 +85,8 @@ const Accounts: React.FC = () => {
   };
 
   const handleDeleteAccount = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this account?')) {
-      dispatch(deleteAccount(id));
+    if (confirm('Are you sure you want to delete this account?')) {
+      await dispatch(deleteAccount(id));
     }
   };
 
@@ -136,7 +114,7 @@ const Accounts: React.FC = () => {
   };
 
   const handleEditSubAccount = (accountId: string, sub: { id: string; name: string; balance: number }) => {
-    setEditingSubAccount({ accountId, id: sub.id, name: sub.name, balance: String(sub.balance || '') });
+    setEditingSubAccount({ accountId, id: sub.id, name: sub.name, balance: sub.balance.toString() });
     setShowEditSubAccountModal(true);
   };
 
@@ -156,45 +134,31 @@ const Accounts: React.FC = () => {
   };
 
   const handleDeleteSubAccount = async (accountId: string, subAccountId: string) => {
-    if (window.confirm('Are you sure you want to delete this sub-account?')) {
-      dispatch(deleteSubAccount({ accountId, subAccountId }));
+    if (confirm('Are you sure you want to delete this sub-account?')) {
+      await dispatch(deleteSubAccount({ accountId, subAccountId }));
     }
   };
 
-  const formatCurrency = (value: number | undefined | null, currency: string) => {
-    const safeValue = value ?? 0;
-    const safeCurrency = currency || 'USD';
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: safeCurrency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      }).format(safeValue);
-    } catch {
-      return `${safeCurrency} ${safeValue.toFixed(2)}`;
-    }
+  // Simple currency formatting - no conversion logic needed
+  const formatCurrency = (amount: number, currency: string): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
-  const getIcon = (type: string | number) => {
-    // Map numeric type to string
-    const typeMap: { [key: number]: string } = {
-      0: 'unspecified',
-      1: 'bank',
-      2: 'cash',
-      3: 'investment',
-      4: 'crypto',
-      5: 'real_estate',
-      6: 'other',
-    };
-    const typeString = typeof type === 'number' ? (typeMap[type] || 'other') : type;
-    const Icon = accountTypeIcons[typeString.toLowerCase()] || Wallet;
-    return Icon;
+  const getIcon = (type: string | number): React.ElementType => {
+    const typeStr = typeof type === 'number' 
+      ? ['other', 'bank', 'cash', 'investment', 'crypto', 'real_estate', 'other'][type] || 'other'
+      : type;
+    return accountTypeIcons[typeStr] || Wallet;
   };
 
   const formatAccountType = (type: string | number): string => {
     const typeMap: { [key: number]: string } = {
-      0: 'Unspecified',
+      0: 'Other',
       1: 'Bank',
       2: 'Cash',
       3: 'Investment',
@@ -206,51 +170,6 @@ const Accounts: React.FC = () => {
       return typeMap[type] || 'Other';
     }
     return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
-  };
-
-  // Convert amount from one currency to another using exchange rates
-  const convertCurrency = (amount: number, from: string, to: string): number => {
-    if (from === to) return amount;
-    
-    // Get rate relative to USD
-    const fromRate = exchangeRates[from] || FALLBACK_RATES[from] || 1;
-    const toRate = exchangeRates[to] || FALLBACK_RATES[to] || 1;
-    
-    // Convert: amount -> USD -> target currency
-    const inUSD = amount / fromRate;
-    return inUSD * toRate;
-  };
-
-  // Determine the display currency for total balance
-  // Always use account's base currency for total, since we convert all sub-accounts to it
-  const getDisplayCurrency = (account: any): { currency: string; mixed: boolean } => {
-    const subAccounts = account.subAccounts || [];
-    if (subAccounts.length === 0) {
-      return { currency: account.currency || 'USD', mixed: false };
-    }
-    const currencies = new Set(subAccounts.map((s: any) => s.currency));
-    const accountCurrency = account.currency || 'USD';
-    
-    // Check if all sub-accounts are in account's currency
-    if (currencies.size === 1 && currencies.has(accountCurrency)) {
-      return { currency: accountCurrency, mixed: false };
-    }
-    
-    // If any sub-account has different currency, we're converting
-    return { currency: accountCurrency, mixed: currencies.size > 1 || !currencies.has(accountCurrency) };
-  };
-
-  // Calculate actual total from sub-accounts with currency conversion
-  const calculateTotal = (account: any): number => {
-    const subAccounts = account.subAccounts || [];
-    const targetCurrency = account.currency || 'USD';
-    
-    return subAccounts.reduce((sum: number, s: any) => {
-      const balance = s.balance || 0;
-      const subCurrency = s.currency || targetCurrency;
-      const converted = convertCurrency(balance, subCurrency, targetCurrency);
-      return sum + converted;
-    }, 0);
   };
 
   return (
@@ -293,23 +212,28 @@ const Accounts: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(Array.isArray(accounts) ? accounts : []).map((account, index) => {
             const Icon = getIcon(account.type);
+            // Use pre-calculated values from backend (already mapped by Redux)
+            const displayCurrency = account.displayCurrency || account.currency || 'USD';
+            const totalBalance = account.convertedTotalBalance ?? account.totalBalance ?? 0;
+            const isMixed = account.isMixedCurrency ?? false;
+            
             return (
               <motion.div
                 key={account.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * index }}
-                className="glass rounded-2xl p-6 hover:border-midnight-500/30 transition-all duration-200 group"
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className="glass p-6 rounded-2xl relative"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-midnight-600 to-midnight-800 flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-midnight-300" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-accent-purple" />
                   </div>
-                  <div className="relative">
-                    <button className="p-2 text-midnight-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className="w-5 h-5" />
+                  <div className="relative group">
+                    <button className="p-2 rounded-lg hover:bg-midnight-800/50 transition-colors">
+                      <MoreVertical className="w-5 h-5 text-midnight-400" />
                     </button>
-                    <div className="absolute right-0 top-full mt-1 w-36 glass rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-midnight-900 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 border border-midnight-700">
                       <button
                         onClick={() => handleEditClick(account)}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-midnight-800/50 rounded-t-lg"
@@ -333,20 +257,14 @@ const Accounts: React.FC = () => {
 
                 <div className="pt-4 border-t border-midnight-800/50">
                   <p className="text-sm text-midnight-400">Total Balance</p>
-                  {(() => {
-                    const { currency, mixed } = getDisplayCurrency(account);
-                    const total = calculateTotal(account);
-                    return (
-                      <div>
-                        <p className="text-2xl font-semibold mt-1">
-                          {mixed ? '~' : ''}{formatCurrency(total || account.totalBalance, currency)}
-                        </p>
-                        {mixed && (
-                          <p className="text-xs text-midnight-500 mt-1">Mixed currencies</p>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  <div>
+                    <p className="text-2xl font-semibold mt-1">
+                      {isMixed ? '~' : ''}{formatCurrency(totalBalance, displayCurrency)}
+                    </p>
+                    {isMixed && (
+                      <p className="text-xs text-midnight-500 mt-1">Mixed currencies</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Sub-accounts section */}
@@ -366,38 +284,47 @@ const Accounts: React.FC = () => {
                   </div>
 
                   {expandedAccounts.has(account.id) && (
-                    <div className="mt-3 space-y-2">
-                      {(account.subAccounts || []).map((sub) => (
-                        <div key={sub.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-midnight-800/30 group/sub">
-                          <span className="text-midnight-300">{sub.name}</span>
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-3 space-y-2"
+                    >
+                      {(account.subAccounts || []).map((sub: any) => (
+                        <div
+                          key={sub.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-midnight-800/30"
+                        >
+                          <div className="text-sm">{sub.name}</div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{formatCurrency(sub.balance, sub.currency)}</span>
-                            <div className="opacity-0 group-hover/sub:opacity-100 transition-opacity flex gap-1">
+                            <div className="text-sm font-medium">
+                              {formatCurrency(sub.balance, sub.currency)}
+                            </div>
+                            <div className="flex gap-1">
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleEditSubAccount(account.id, sub); }}
-                                className="p-1 text-midnight-400 hover:text-white"
+                                onClick={() => handleEditSubAccount(account.id, sub)}
+                                className="p-1 rounded hover:bg-midnight-700/50"
                               >
-                                <Edit className="w-3 h-3" />
+                                <Edit className="w-3 h-3 text-midnight-400" />
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteSubAccount(account.id, sub.id); }}
-                                className="p-1 text-accent-coral hover:text-red-400"
+                                onClick={() => handleDeleteSubAccount(account.id, sub.id)}
+                                className="p-1 rounded hover:bg-midnight-700/50"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3 h-3 text-accent-coral" />
                               </button>
                             </div>
                           </div>
                         </div>
                       ))}
-
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleAddSubAccount(account.id); }}
-                        className="w-full py-2 px-3 rounded-lg border border-dashed border-midnight-600 text-midnight-400 hover:text-white hover:border-midnight-500 transition-colors text-sm flex items-center justify-center gap-2"
+                        onClick={() => handleAddSubAccount(account.id)}
+                        className="w-full flex items-center justify-center gap-2 p-2 rounded-lg border border-dashed border-midnight-600 text-midnight-400 hover:border-accent-purple hover:text-accent-purple transition-colors text-sm"
                       >
                         <Plus className="w-4 h-4" />
                         Add Sub-account
                       </button>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               </motion.div>
@@ -406,7 +333,7 @@ const Accounts: React.FC = () => {
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* Create Account Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -414,7 +341,15 @@ const Accounts: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="glass rounded-2xl p-6 w-full max-w-md"
           >
-            <h3 className="text-xl font-semibold mb-6">Create New Account</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Create Account</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 text-midnight-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div>
@@ -429,16 +364,16 @@ const Accounts: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-midnight-400 mb-2">Account Type</label>
+                <label className="block text-sm text-midnight-400 mb-2">Type</label>
                 <select
                   value={newAccount.type}
                   onChange={(e) => setNewAccount({ ...newAccount, type: e.target.value })}
                   className="input-field"
                 >
-                  <option value="bank">Bank Account</option>
+                  <option value="bank">Bank</option>
                   <option value="cash">Cash</option>
                   <option value="investment">Investment</option>
-                  <option value="crypto">Cryptocurrency</option>
+                  <option value="crypto">Crypto</option>
                   <option value="real_estate">Real Estate</option>
                   <option value="other">Other</option>
                 </select>
@@ -454,8 +389,11 @@ const Accounts: React.FC = () => {
                   <option value="USD">USD - US Dollar</option>
                   <option value="EUR">EUR - Euro</option>
                   <option value="GBP">GBP - British Pound</option>
-                  <option value="JPY">JPY - Japanese Yen</option>
                   <option value="RUB">RUB - Russian Ruble</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
                 </select>
               </div>
             </div>
@@ -487,28 +425,31 @@ const Accounts: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="glass rounded-2xl p-6 w-full max-w-md"
           >
-            <h3 className="text-xl font-semibold mb-6">Edit Account</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Edit Account</h3>
+              <button
+                onClick={() => { setShowEditModal(false); setEditingAccount(null); }}
+                className="p-2 text-midnight-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-midnight-400 mb-2">
-                  Account Name
-                </label>
+                <label className="block text-sm text-midnight-400 mb-2">Account Name</label>
                 <input
                   type="text"
                   value={editingAccount.name}
                   onChange={(e) => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-midnight-900/50 border border-midnight-700 focus:border-midnight-500 focus:outline-none"
-                  placeholder="Enter account name"
+                  className="input-field"
                 />
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditingAccount(null);
-                }}
+                onClick={() => { setShowEditModal(false); setEditingAccount(null); }}
                 className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
               >
                 Cancel
@@ -551,7 +492,7 @@ const Accounts: React.FC = () => {
                   value={newSubAccount.name}
                   onChange={(e) => setNewSubAccount({ ...newSubAccount, name: e.target.value })}
                   className="input-field"
-                  placeholder="e.g., USD Balance, Savings"
+                  placeholder="e.g., Savings, USD Account"
                 />
               </div>
 
@@ -562,14 +503,9 @@ const Accounts: React.FC = () => {
                   inputMode="decimal"
                   value={newSubAccount.balance}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                      setNewSubAccount({ ...newSubAccount, balance: val });
-                    }
-                  }}
-                  onFocus={(e) => {
-                    if (e.target.value === '0') {
-                      setNewSubAccount({ ...newSubAccount, balance: '' });
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setNewSubAccount({ ...newSubAccount, balance: value });
                     }
                   }}
                   className="input-field"
@@ -587,8 +523,11 @@ const Accounts: React.FC = () => {
                   <option value="USD">USD - US Dollar</option>
                   <option value="EUR">EUR - Euro</option>
                   <option value="GBP">GBP - British Pound</option>
-                  <option value="JPY">JPY - Japanese Yen</option>
                   <option value="RUB">RUB - Russian Ruble</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
                 </select>
               </div>
             </div>
@@ -605,7 +544,7 @@ const Accounts: React.FC = () => {
                 disabled={!newSubAccount.name}
                 className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create
+                Add
               </button>
             </div>
           </motion.div>
@@ -638,7 +577,6 @@ const Accounts: React.FC = () => {
                   value={editingSubAccount.name}
                   onChange={(e) => setEditingSubAccount({ ...editingSubAccount, name: e.target.value })}
                   className="input-field"
-                  placeholder="Sub-account name"
                 />
               </div>
 
@@ -649,18 +587,13 @@ const Accounts: React.FC = () => {
                   inputMode="decimal"
                   value={editingSubAccount.balance}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                      setEditingSubAccount({ ...editingSubAccount, balance: val });
-                    }
-                  }}
-                  onFocus={(e) => {
-                    if (e.target.value === '0') {
-                      setEditingSubAccount({ ...editingSubAccount, balance: '' });
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setEditingSubAccount({ ...editingSubAccount, balance: value });
                     }
                   }}
                   className="input-field"
-                  placeholder="Enter amount"
+                  placeholder="0.00"
                 />
               </div>
             </div>
@@ -688,4 +621,3 @@ const Accounts: React.FC = () => {
 };
 
 export default Accounts;
-

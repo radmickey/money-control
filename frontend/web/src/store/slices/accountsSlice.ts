@@ -6,6 +6,7 @@ export interface SubAccount {
   name: string;
   currency: string;
   balance: number;
+  convertedBalance?: number;
   assetType: string;
 }
 
@@ -15,6 +16,10 @@ export interface Account {
   type: string;
   currency: string;
   totalBalance: number;
+  // Pre-calculated by backend
+  convertedTotalBalance?: number;
+  displayCurrency?: string;
+  isMixedCurrency?: boolean;
   subAccounts: SubAccount[];
   icon?: string;
   color?: string;
@@ -47,11 +52,16 @@ const mapApiAccount = (apiAccount: any): Account => ({
   type: apiAccount.type,
   currency: apiAccount.currency,
   totalBalance: apiAccount.total_balance || apiAccount.totalBalance || 0,
+  // New fields from backend conversion
+  convertedTotalBalance: apiAccount.converted_total_balance ?? apiAccount.convertedTotalBalance ?? apiAccount.total_balance ?? 0,
+  displayCurrency: apiAccount.display_currency || apiAccount.displayCurrency || apiAccount.currency || 'USD',
+  isMixedCurrency: apiAccount.is_mixed_currency ?? apiAccount.isMixedCurrency ?? false,
   subAccounts: (apiAccount.sub_accounts || apiAccount.subAccounts || []).map((sub: any) => ({
     id: sub.id,
     name: sub.name,
     currency: sub.currency,
     balance: sub.balance || 0,
+    convertedBalance: sub.converted_balance ?? sub.convertedBalance ?? sub.balance ?? 0,
     assetType: sub.asset_type || sub.assetType || 'cash',
   })),
   icon: apiAccount.icon,
