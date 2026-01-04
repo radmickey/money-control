@@ -19,12 +19,30 @@ interface AuthState {
   error: string | null;
 }
 
+// Try to restore user from localStorage
+const getSavedUser = (): User | null => {
+  try {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveUser = (user: User | null) => {
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('user');
+  }
+};
+
 const initialState: AuthState = {
-  user: null,
+  user: getSavedUser(),
   token: localStorage.getItem('token'),
   refreshToken: localStorage.getItem('refreshToken'),
   isAuthenticated: !!localStorage.getItem('token'),
-  loading: false,
+  loading: !!localStorage.getItem('token') && !getSavedUser(), // Loading if token exists but no user
   error: null,
 };
 
@@ -160,6 +178,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
     },
     clearError: (state) => {
       state.error = null;
@@ -185,6 +204,7 @@ const authSlice = createSlice({
         state.token = action.payload.accessToken;
         state.refreshToken = action.payload.refreshToken;
         state.user = action.payload.user;
+        saveUser(action.payload.user);
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -201,6 +221,7 @@ const authSlice = createSlice({
         state.token = action.payload.accessToken;
         state.refreshToken = action.payload.refreshToken;
         state.user = action.payload.user;
+        saveUser(action.payload.user);
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -213,17 +234,20 @@ const authSlice = createSlice({
       .addCase(getProfile.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        saveUser(action.payload);
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.loading = false;
-        // Only logout if it's an auth error (401), not other errors
         const error = action.payload as string;
+        // Only logout if it's an auth error (401), not other errors
         if (error?.includes('Unauthorized') || error?.includes('401') || error?.includes('token')) {
           state.isAuthenticated = false;
           state.token = null;
+          state.user = null;
           localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
         }
-        // Otherwise just set error, don't logout
         state.error = error || 'Failed to fetch profile';
       })
       // Update Profile
@@ -234,6 +258,7 @@ const authSlice = createSlice({
       .addCase(updateProfile.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        saveUser(action.payload);
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.loading = false;
@@ -250,6 +275,7 @@ const authSlice = createSlice({
         state.token = action.payload.accessToken;
         state.refreshToken = action.payload.refreshToken;
         state.user = action.payload.user;
+        saveUser(action.payload.user);
       })
       .addCase(telegramLogin.rejected, (state, action) => {
         state.loading = false;
