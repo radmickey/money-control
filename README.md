@@ -1,174 +1,151 @@
-# Money Control 💰
+# Money Control
 
-A full-stack, microservices-based personal finance management application for comprehensive asset tracking. Track stocks, crypto, ETFs, real estate, bank accounts, and more in one unified dashboard.
+Personal finance management application with microservices architecture.
 
-![Money Control](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8.svg)
 ![React](https://img.shields.io/badge/React-18.2-61DAFB.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 <p align="center">
   <img src="docs/screenshots/landing.png" alt="Landing Page" width="100%">
 </p>
 
-## 📖 Documentation
+## Documentation
 
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](docs/guides/getting-started.md) | Quick start guide |
-| [Google OAuth Setup](docs/guides/google-oauth.md) | Configure Google authentication |
-| [Telegram Mini App](docs/guides/telegram-miniapp.md) | Set up Telegram integration |
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/guides/getting-started.md) | Installation and setup |
+| [Google OAuth](docs/guides/google-oauth.md) | Google authentication configuration |
+| [Telegram Mini App](docs/guides/telegram-miniapp.md) | Telegram integration |
 | [Resilience Patterns](docs/guides/resilience.md) | Circuit breakers, retries, health checks |
-| [API Reference](docs/api/README.md) | Full API documentation |
+| [API Reference](docs/api/README.md) | REST API documentation |
 
-## ✨ Features
+## Features
 
-- 🏦 **Unified Net Worth Tracking** - Track all your assets in one place
-- 💱 **Multi-Currency Support** - Sub-accounts in different currencies with automatic conversion
-- 📈 **Real-time Asset Prices** - Integration with Alpha Vantage (stocks/ETFs) and CoinGecko (crypto)
-- 📊 **Beautiful Dashboard** - Allocation charts, trends, and insights
-- 🌐 **Cross-Platform** - Web, iOS, Android, and Telegram Mini App
-- 🔐 **Secure Authentication** - JWT + Google OAuth + Telegram Auth
-- 🏗️ **Microservices Architecture** - Scalable and maintainable design
-- 🛡️ **High Availability** - Circuit breakers, retries, health checks
-- 🐳 **Docker Ready** - One command deployment
+- Multi-asset tracking: stocks, crypto, ETFs, real estate, bank accounts
+- Multi-currency support with automatic conversion
+- Real-time prices via Alpha Vantage and CoinGecko
+- Cross-platform: Web, iOS, Android, Telegram
+- JWT + OAuth + Telegram authentication
+- High availability: circuit breakers, retries, health probes
 
-## 🖥️ Screenshots
+## Screenshots
 
-<table>
-  <tr>
-    <td><img src="docs/screenshots/login.png" alt="Login" width="400"></td>
-    <td><img src="docs/screenshots/register.png" alt="Register" width="400"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Login</b></td>
-    <td align="center"><b>Register</b></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard" width="400"></td>
-    <td><img src="docs/screenshots/accounts.png" alt="Accounts" width="400"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Dashboard</b></td>
-    <td align="center"><b>Accounts</b></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/screenshots/transactions.png" alt="Transactions" width="800"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><b>Transactions</b></td>
-  </tr>
-</table>
+| Login | Register |
+|-------|----------|
+| ![Login](docs/screenshots/login.png) | ![Register](docs/screenshots/register.png) |
 
-## 🏗️ Architecture
+| Dashboard | Accounts |
+|-----------|----------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Accounts](docs/screenshots/accounts.png) |
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                            Clients                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐  │
-│  │   Web App   │  │ Mobile App  │  │   Telegram Mini App + Bot   │  │
-│  │   (React)   │  │(React Native│  │      (WebApp SDK)           │  │
-│  └──────┬──────┘  └──────┬──────┘  └──────────────┬──────────────┘  │
-└─────────┼────────────────┼───────────────────────┼──────────────────┘
-          │                │                        │
-          ▼                ▼                        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        API Gateway (Gin)                            │
-│  Rate Limiting • JWT Validation • Circuit Breaker • Health Checks   │
-│          Retry Policy • Keepalive • Logging • CORS                  │
-│                        Port: 9080                                   │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ Health Endpoints: /health • /ready • /health/circuits        │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │ gRPC (with retry + timeout)
-          ┌─────────────────────┼─────────────────────┐
-          ▼                     ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   Auth Service  │   │Accounts Service │   │  Transactions   │
-│   PostgreSQL    │   │   PostgreSQL    │   │   PostgreSQL    │
-│   Port: 50051   │   │   Port: 50052   │   │   Port: 50053   │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
-
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│ Assets Service  │   │Currency Service │   │Insights Service │
-│   PostgreSQL    │   │   PostgreSQL    │   │   PostgreSQL    │
-│   + Redis       │   │   + Redis       │   │                 │
-│   Port: 50054   │   │   Port: 50055   │   │   Port: 50056   │
-└────────┬────────┘   └────────┬────────┘   └─────────────────┘
-         │                     │
-         ▼                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      External APIs                          │
-│   Alpha Vantage • CoinGecko • Frankfurter • ЦБ РФ           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                          Clients                                │
+│     Web (React)  │  Mobile (React Native)  │  Telegram Bot      │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Gateway (Gin)                            │
+│  Rate Limiting │ JWT │ Circuit Breaker │ Health Checks          │
+│  Port: 9080                                                     │
+│  Endpoints: /health, /ready, /health/circuits                   │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ gRPC (retry + timeout)
+       ┌─────────────────────┼─────────────────────┐
+       ▼                     ▼                     ▼
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│    Auth     │       │  Accounts   │       │Transactions │
+│  :50051     │       │   :50052    │       │   :50053    │
+└─────────────┘       └─────────────┘       └─────────────┘
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│   Assets    │       │  Currency   │       │  Insights   │
+│   :50054    │       │   :50055    │       │   :50056    │
+└─────────────┘       └─────────────┘       └─────────────┘
+       │                     │
+       ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      External APIs                              │
+│        Alpha Vantage │ CoinGecko │ Frankfurter │ CBR            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Resilience Features
+### Resilience
 
-| Feature | Description |
-|---------|-------------|
-| **Circuit Breaker** | Opens after 5 failures, prevents cascading failures |
-| **Retry Policy** | 3 attempts with exponential backoff (0.1s → 1s) |
-| **Timeouts** | 10s per gRPC call, 15s HTTP read/write |
-| **Keepalive** | Ping every 10s to maintain connection health |
-| **Health Probes** | Kubernetes-ready liveness and readiness endpoints |
+| Feature | Configuration |
+|---------|---------------|
+| Circuit Breaker | 5 failures → open, 30s timeout |
+| Retry Policy | 3 attempts, exponential backoff |
+| Timeouts | 10s gRPC, 15s HTTP |
+| Keepalive | 10s ping interval |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 money-control/
 ├── backend/
-│   ├── proto/                    # Protocol Buffer definitions
 │   ├── pkg/
-│   │   ├── auth/                 # JWT & OAuth utilities
-│   │   ├── cache/                # Redis caching
-│   │   ├── converters/           # Type conversions (DRY)
-│   │   ├── database/             # PostgreSQL connection
-│   │   ├── health/               # Health check system
-│   │   ├── middleware/           # HTTP middleware
-│   │   ├── resilience/           # Circuit breaker & retries
-│   │   └── utils/                # Common utilities
+│   │   ├── auth/           # JWT, OAuth
+│   │   ├── cache/          # Redis
+│   │   ├── converters/     # Type conversions
+│   │   ├── database/       # PostgreSQL
+│   │   ├── health/         # Health checks
+│   │   ├── middleware/     # HTTP middleware
+│   │   └── resilience/     # Circuit breaker
+│   ├── proto/              # Protocol Buffers
 │   └── services/
-│       ├── auth/                 # Authentication (JWT, Google, Telegram)
-│       ├── accounts/             # Accounts & sub-accounts management
-│       ├── transactions/         # Transaction tracking
-│       ├── assets/               # Asset management + price APIs
-│       ├── currency/             # Currency exchange rates
-│       ├── insights/             # Analytics and insights
-│       └── gateway/              # API Gateway
+│       ├── auth/
+│       ├── accounts/
+│       ├── transactions/
+│       ├── assets/
+│       ├── currency/
+│       ├── insights/
+│       └── gateway/
 ├── frontend/
-│   ├── web/                      # React + Vite + Tailwind
-│   │   └── src/
-│   │       ├── components/       # Reusable components
-│   │       ├── constants/        # Shared constants (DRY)
-│   │       ├── pages/            # Page components
-│   │       ├── store/            # Redux store & slices
-│   │       └── utils/            # Formatters & helpers
-│   └── mobile/                   # React Native + Expo
-├── docs/                         # Documentation
-├── docker-compose.yml            # Docker orchestration
-├── Makefile                      # Build automation
-└── .env                          # Environment variables
+│   ├── web/                # React + Vite
+│   └── mobile/             # React Native
+├── docs/
+└── docker-compose.yml
 ```
 
-## 📊 Tech Stack
+## Tech Stack
 
 | Layer | Technologies |
 |-------|--------------|
-| **Backend** | Go 1.24, Gin, gRPC, GORM, PostgreSQL, Redis |
-| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Redux Toolkit |
-| **Mobile** | React Native, Expo |
-| **Infrastructure** | Docker, Docker Compose, nginx |
+| Backend | Go, Gin, gRPC, GORM, PostgreSQL, Redis |
+| Frontend | React, Vite, TypeScript, Tailwind, Redux |
+| Mobile | React Native, Expo |
+| Infrastructure | Docker, Docker Compose |
 
-## 📄 License
+## Quick Start
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+# Clone
+git clone https://github.com/radmickey/money-control.git
+cd money-control
 
----
+# Configure
+cp .env.example .env
 
-<p align="center">
-  Built with ❤️ for better financial tracking
-</p>
+# Run
+docker compose up -d
+
+# Access
+open http://localhost:3000
+```
+
+## Health Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Liveness probe |
+| `GET /ready` | Readiness probe |
+| `GET /health/circuits` | Circuit breaker status |
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
