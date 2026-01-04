@@ -20,6 +20,7 @@ A full-stack, microservices-based personal finance management application for co
 | [Getting Started](docs/guides/getting-started.md) | Quick start guide |
 | [Google OAuth Setup](docs/guides/google-oauth.md) | Configure Google authentication |
 | [Telegram Mini App](docs/guides/telegram-miniapp.md) | Set up Telegram integration |
+| [Resilience Patterns](docs/guides/resilience.md) | Circuit breakers, retries, health checks |
 | [API Reference](docs/api/README.md) | Full API documentation |
 
 ## ✨ Features
@@ -31,6 +32,7 @@ A full-stack, microservices-based personal finance management application for co
 - 🌐 **Cross-Platform** - Web, iOS, Android, and Telegram Mini App
 - 🔐 **Secure Authentication** - JWT + Google OAuth + Telegram Auth
 - 🏗️ **Microservices Architecture** - Scalable and maintainable design
+- 🛡️ **High Availability** - Circuit breakers, retries, health checks
 - 🐳 **Docker Ready** - One command deployment
 
 ## 🖥️ Screenshots
@@ -74,10 +76,14 @@ A full-stack, microservices-based personal finance management application for co
           ▼                ▼                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        API Gateway (Gin)                            │
-│          Rate Limiting • JWT Validation • Logging • CORS            │
+│  Rate Limiting • JWT Validation • Circuit Breaker • Health Checks   │
+│          Retry Policy • Keepalive • Logging • CORS                  │
 │                        Port: 9080                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ Health Endpoints: /health • /ready • /health/circuits        │   │
+│  └──────────────────────────────────────────────────────────────┘   │
 └───────────────────────────────┬─────────────────────────────────────┘
-                                │ gRPC
+                                │ gRPC (with retry + timeout)
           ┌─────────────────────┼─────────────────────┐
           ▼                     ▼                     ▼
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
@@ -96,9 +102,19 @@ A full-stack, microservices-based personal finance management application for co
          ▼                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      External APIs                          │
-│     Alpha Vantage • CoinGecko • ExchangeRates.io            │
+│   Alpha Vantage • CoinGecko • Frankfurter • ЦБ РФ           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Resilience Features
+
+| Feature | Description |
+|---------|-------------|
+| **Circuit Breaker** | Opens after 5 failures, prevents cascading failures |
+| **Retry Policy** | 3 attempts with exponential backoff (0.1s → 1s) |
+| **Timeouts** | 10s per gRPC call, 15s HTTP read/write |
+| **Keepalive** | Ping every 10s to maintain connection health |
+| **Health Probes** | Kubernetes-ready liveness and readiness endpoints |
 
 ## 📁 Project Structure
 
@@ -106,7 +122,15 @@ A full-stack, microservices-based personal finance management application for co
 money-control/
 ├── backend/
 │   ├── proto/                    # Protocol Buffer definitions
-│   ├── pkg/                      # Shared packages
+│   ├── pkg/
+│   │   ├── auth/                 # JWT & OAuth utilities
+│   │   ├── cache/                # Redis caching
+│   │   ├── converters/           # Type conversions (DRY)
+│   │   ├── database/             # PostgreSQL connection
+│   │   ├── health/               # Health check system
+│   │   ├── middleware/           # HTTP middleware
+│   │   ├── resilience/           # Circuit breaker & retries
+│   │   └── utils/                # Common utilities
 │   └── services/
 │       ├── auth/                 # Authentication (JWT, Google, Telegram)
 │       ├── accounts/             # Accounts & sub-accounts management
@@ -117,6 +141,12 @@ money-control/
 │       └── gateway/              # API Gateway
 ├── frontend/
 │   ├── web/                      # React + Vite + Tailwind
+│   │   └── src/
+│   │       ├── components/       # Reusable components
+│   │       ├── constants/        # Shared constants (DRY)
+│   │       ├── pages/            # Page components
+│   │       ├── store/            # Redux store & slices
+│   │       └── utils/            # Formatters & helpers
 │   └── mobile/                   # React Native + Expo
 ├── docs/                         # Documentation
 ├── docker-compose.yml            # Docker orchestration

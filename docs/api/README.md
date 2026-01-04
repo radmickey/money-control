@@ -25,6 +25,98 @@ Authorization: Bearer <your_access_token>
 - [Insights](./insights.md)
 - [Currency](./currency.md)
 
+## Health Endpoints
+
+Health endpoints are available at the root level (not under `/api/v1`).
+
+### Liveness Probe
+
+```http
+GET /health
+```
+
+Returns service running status. Use for Kubernetes `livenessProbe`.
+
+**Response:**
+```json
+{
+  "status": "UP",
+  "service": "gateway",
+  "version": "1.0.0",
+  "timestamp": "2024-01-04T12:00:00Z"
+}
+```
+
+### Readiness Probe
+
+```http
+GET /ready
+```
+
+Checks all dependencies (Redis, databases). Use for Kubernetes `readinessProbe`.
+
+**Response (Healthy - 200):**
+```json
+{
+  "status": "UP",
+  "version": "1.0.0",
+  "checks": {
+    "redis": {
+      "name": "redis",
+      "status": "UP",
+      "message": "Redis connection is healthy"
+    }
+  },
+  "timestamp": "2024-01-04T12:00:00Z"
+}
+```
+
+**Response (Unhealthy - 503):**
+```json
+{
+  "status": "DOWN",
+  "checks": {
+    "redis": {
+      "status": "DOWN",
+      "message": "connection refused"
+    }
+  }
+}
+```
+
+### Health Details
+
+```http
+GET /health/details
+```
+
+Full health report including circuit breaker status.
+
+### Circuit Breaker Status
+
+```http
+GET /health/circuits
+```
+
+Returns status of all circuit breakers.
+
+**Response:**
+```json
+{
+  "accounts-service": {
+    "name": "accounts-service",
+    "state": "closed",
+    "failures": 0,
+    "successes": 10
+  }
+}
+```
+
+Circuit breaker states:
+- `closed` - Normal operation
+- `open` - Failing fast (service down)
+- `half-open` - Testing if service recovered
+
 ## Response Format
 
 ### Success Response
@@ -58,7 +150,9 @@ Authorization: Bearer <your_access_token>
 | 401 | Unauthorized |
 | 403 | Forbidden |
 | 404 | Not Found |
+| 429 | Too Many Requests (rate limited) |
 | 500 | Internal Server Error |
+| 503 | Service Unavailable (circuit open) |
 
 ## Rate Limiting
 
