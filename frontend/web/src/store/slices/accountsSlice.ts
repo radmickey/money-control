@@ -97,21 +97,6 @@ export const createAccount = createAsyncThunk(
   }
 );
 
-// Map numeric type from API to string type
-const mapAccountType = (type: number | string): string => {
-  if (typeof type === 'string') return type;
-  const types: { [key: number]: string } = {
-    0: 'bank',
-    1: 'cash',
-    2: 'investment',
-    3: 'crypto',
-    4: 'real_estate',
-    5: 'other',
-    6: 'bank', // Default
-  };
-  return types[type] || 'other';
-};
-
 export const updateAccount = createAsyncThunk(
   'accounts/updateAccount',
   async ({ id, data }: { id: string; data: Partial<Account> }, { rejectWithValue }) => {

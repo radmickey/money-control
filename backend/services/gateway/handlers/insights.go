@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/radmickey/money-control/backend/pkg/converters"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
 	currencypb "github.com/radmickey/money-control/backend/proto/currency"
 	insightspb "github.com/radmickey/money-control/backend/proto/insights"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // InsightsHandler handles insights-related requests
@@ -31,9 +31,7 @@ func (h *InsightsHandler) GetNetWorth(c *gin.Context) {
 	if baseCurrency == "" {
 		baseCurrency = c.Query("currency")
 	}
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency = converters.DefaultCurrency(baseCurrency)
 
 	// Get all accounts
 	accountsResp, err := h.proxy.Accounts.ListAccounts(c.Request.Context(), &accountspb.ListAccountsRequest{
@@ -47,19 +45,7 @@ func (h *InsightsHandler) GetNetWorth(c *gin.Context) {
 	}
 
 	// Get exchange rates
-	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
-		BaseCurrency: baseCurrency,
-	})
-
-	rates := make(map[string]float64)
-	rates[baseCurrency] = 1.0
-	if err != nil {
-		log.Printf("Warning: Failed to get exchange rates: %v", err)
-	} else if ratesResp != nil {
-		for currency, rate := range ratesResp.Rates {
-			rates[currency] = rate
-		}
-	}
+	rates := h.fetchExchangeRates(c, baseCurrency)
 
 	// Calculate total net worth with conversion
 	var totalNetWorth float64
@@ -77,7 +63,7 @@ func (h *InsightsHandler) GetNetWorth(c *gin.Context) {
 			}
 
 			// Convert to base currency
-			converted := convertAmountInsights(sub.Balance, subCurrency, baseCurrency, rates)
+			converted := converters.ConvertAmount(sub.Balance, subCurrency, baseCurrency, rates)
 			totalNetWorth += converted
 		}
 	}
@@ -114,33 +100,27 @@ func (h *InsightsHandler) GetNetWorth(c *gin.Context) {
 	utils.Success(c, result)
 }
 
-// convertAmountInsights converts amount from one currency to another
-func convertAmountInsights(amount float64, from, to string, rates map[string]float64) float64 {
-	if from == to {
-		return amount
-	}
+// fetchExchangeRates fetches exchange rates from currency service
+func (h *InsightsHandler) fetchExchangeRates(c *gin.Context, baseCurrency string) map[string]float64 {
+	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
+		BaseCurrency: baseCurrency,
+	})
 
-	fromRate := rates[from]
-	toRate := rates[to]
-
-	if fromRate == 0 {
-		fromRate = 1
+	rates := converters.BuildRatesMap(baseCurrency, nil)
+	if err != nil {
+		log.Printf("Warning: Failed to get exchange rates: %v", err)
+		return rates
 	}
-	if toRate == 0 {
-		toRate = 1
+	if ratesResp != nil {
+		return converters.BuildRatesMap(baseCurrency, ratesResp.Rates)
 	}
-
-	inBase := amount / fromRate
-	return inBase * toRate
+	return rates
 }
 
 // GetTrends gets net worth trends/history
 func (h *InsightsHandler) GetTrends(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 	period := c.Query("period")
 	if period == "" {
 		period = "30d"
@@ -162,10 +142,7 @@ func (h *InsightsHandler) GetTrends(c *gin.Context) {
 // GetAllocation gets asset allocation
 func (h *InsightsHandler) GetAllocation(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 	groupBy := c.Query("group_by")
 	if groupBy == "" {
 		groupBy = "asset_type"
@@ -187,10 +164,7 @@ func (h *InsightsHandler) GetAllocation(c *gin.Context) {
 // GetDashboard gets dashboard summary
 func (h *InsightsHandler) GetDashboard(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 
 	resp, err := h.proxy.Insights.GetDashboardSummary(c.Request.Context(), &insightspb.GetDashboardSummaryRequest{
 		UserId:       userID,
@@ -207,34 +181,18 @@ func (h *InsightsHandler) GetDashboard(c *gin.Context) {
 // GetCashFlow gets cash flow
 func (h *InsightsHandler) GetCashFlow(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 	period := c.Query("period")
 	if period == "" {
 		period = "monthly"
-	}
-
-	startDateStr := c.Query("start_date")
-	endDateStr := c.Query("end_date")
-
-	var startDate, endDate *timestamppb.Timestamp
-	if startDateStr != "" {
-		t, _ := time.Parse("2006-01-02", startDateStr)
-		startDate = timestamppb.New(t)
-	}
-	if endDateStr != "" {
-		t, _ := time.Parse("2006-01-02", endDateStr)
-		endDate = timestamppb.New(t)
 	}
 
 	resp, err := h.proxy.Insights.GetCashFlow(c.Request.Context(), &insightspb.GetCashFlowRequest{
 		UserId:       userID,
 		BaseCurrency: baseCurrency,
 		Period:       period,
-		StartDate:    startDate,
-		EndDate:      endDate,
+		StartDate:    converters.ParseDate(c.Query("start_date")),
+		EndDate:      converters.ParseDate(c.Query("end_date")),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
@@ -247,34 +205,18 @@ func (h *InsightsHandler) GetCashFlow(c *gin.Context) {
 // GetNetWorthHistory gets net worth history
 func (h *InsightsHandler) GetNetWorthHistory(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 	period := c.Query("period")
 	if period == "" {
 		period = "30d"
-	}
-
-	startDateStr := c.Query("start_date")
-	endDateStr := c.Query("end_date")
-
-	var startDate, endDate *timestamppb.Timestamp
-	if startDateStr != "" {
-		t, _ := time.Parse("2006-01-02", startDateStr)
-		startDate = timestamppb.New(t)
-	}
-	if endDateStr != "" {
-		t, _ := time.Parse("2006-01-02", endDateStr)
-		endDate = timestamppb.New(t)
 	}
 
 	resp, err := h.proxy.Insights.GetNetWorthHistory(c.Request.Context(), &insightspb.GetNetWorthHistoryRequest{
 		UserId:       userID,
 		BaseCurrency: baseCurrency,
 		Period:       period,
-		StartDate:    startDate,
-		EndDate:      endDate,
+		StartDate:    converters.ParseDate(c.Query("start_date")),
+		EndDate:      converters.ParseDate(c.Query("end_date")),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())

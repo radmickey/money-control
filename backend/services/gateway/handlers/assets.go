@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/radmickey/money-control/backend/pkg/converters"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	assetspb "github.com/radmickey/money-control/backend/proto/assets"
@@ -42,7 +43,7 @@ func (h *AssetsHandler) CreateAsset(c *gin.Context) {
 		SubAccountId:  req.SubAccountID,
 		Symbol:        req.Symbol,
 		Name:          req.Name,
-		Type:          stringToAssetTypeAssets(req.Type),
+		Type:          converters.StringToAssetTypeAssets(req.Type),
 		Quantity:      req.Quantity,
 		PurchasePrice: req.PurchasePrice,
 		Currency:      req.Currency,
@@ -64,7 +65,7 @@ func (h *AssetsHandler) ListAssets(c *gin.Context) {
 	resp, err := h.proxy.Assets.ListAssets(c.Request.Context(), &assetspb.ListAssetsRequest{
 		UserId:       userID,
 		SubAccountId: subAccountID,
-		Type:         stringToAssetTypeAssets(assetType),
+		Type:         converters.StringToAssetTypeAssets(assetType),
 		Page:         1,
 		PageSize:     100,
 	})
@@ -155,7 +156,7 @@ func (h *AssetsHandler) GetPrice(c *gin.Context) {
 
 	resp, err := h.proxy.Assets.GetAssetPrice(c.Request.Context(), &assetspb.GetAssetPriceRequest{
 		Symbol: symbol,
-		Type:   stringToAssetTypeAssets(assetType),
+		Type:   converters.StringToAssetTypeAssets(assetType),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
@@ -172,7 +173,7 @@ func (h *AssetsHandler) SearchAssets(c *gin.Context) {
 
 	resp, err := h.proxy.Assets.SearchAssets(c.Request.Context(), &assetspb.SearchAssetsRequest{
 		Query: query,
-		Type:  stringToAssetTypeAssets(assetType),
+		Type:  converters.StringToAssetTypeAssets(assetType),
 		Limit: 10,
 	})
 	if err != nil {
@@ -183,22 +184,3 @@ func (h *AssetsHandler) SearchAssets(c *gin.Context) {
 	utils.Success(c, resp.Results)
 }
 
-// Helper functions
-func stringToAssetTypeAssets(s string) assetspb.AssetType {
-	switch s {
-	case "STOCK", "stock":
-		return assetspb.AssetType_ASSET_TYPE_STOCK
-	case "CRYPTO", "crypto":
-		return assetspb.AssetType_ASSET_TYPE_CRYPTO
-	case "ETF", "etf":
-		return assetspb.AssetType_ASSET_TYPE_ETF
-	case "REAL_ESTATE", "real_estate":
-		return assetspb.AssetType_ASSET_TYPE_REAL_ESTATE
-	case "CASH", "cash":
-		return assetspb.AssetType_ASSET_TYPE_CASH
-	case "BOND", "bond":
-		return assetspb.AssetType_ASSET_TYPE_BOND
-	default:
-		return assetspb.AssetType_ASSET_TYPE_OTHER
-	}
-}

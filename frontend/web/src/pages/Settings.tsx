@@ -6,24 +6,13 @@ import {
   Shield,
   CreditCard,
   Globe,
-  Palette,
   Smartphone,
   Key,
   Save,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { updateProfile, getProfile } from '../store/slices/authSlice';
-
-const currencies = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'RUB', name: 'Russian Ruble', symbol: '₽' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-];
+import { CURRENCIES } from '../constants';
 
 const Settings: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -132,7 +121,7 @@ const Settings: React.FC = () => {
                 All your assets and net worth will be converted to this currency
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {currencies.map((currency) => (
+                {CURRENCIES.map((currency) => (
                   <button
                     key={currency.code}
                     onClick={() => setFormData({ ...formData, baseCurrency: currency.code })}

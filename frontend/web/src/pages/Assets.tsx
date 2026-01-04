@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchAssets, createAsset, fetchAssetPrice } from '../store/slices/assetsSlice';
+import { formatCurrency, formatPercent } from '../utils/formatters';
 
 const assetTypeIcons: { [key: string]: React.ElementType } = {
   stock: BarChart3,
@@ -71,18 +72,6 @@ const Assets: React.FC = () => {
         dispatch(fetchAssetPrice({ symbol: asset.symbol, type: asset.type }));
       }
     });
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(2)}%`;
   };
 
   const calculateGainLoss = (asset: any) => {

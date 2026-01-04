@@ -210,7 +210,6 @@ func (h *AccountsHandler) convertSubAccounts(subs []*accountspb.SubAccount, acco
 	return subAccounts, convertedTotal, balanceInBase, isMixed
 }
 
-
 // GetAccount gets an account
 func (h *AccountsHandler) GetAccount(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
@@ -455,4 +454,3 @@ func (h *AccountsHandler) GetNetWorth(c *gin.Context) {
 
 	utils.Success(c, resp)
 }
-
