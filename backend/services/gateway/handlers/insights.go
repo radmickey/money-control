@@ -142,7 +142,12 @@ func (h *InsightsHandler) GetTrends(c *gin.Context) {
 // GetAllocation gets asset allocation
 func (h *InsightsHandler) GetAllocation(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
+	// Support both "baseCurrency" and "currency" query params
+	baseCurrency := c.Query("baseCurrency")
+	if baseCurrency == "" {
+		baseCurrency = c.Query("currency")
+	}
+	baseCurrency = converters.DefaultCurrency(baseCurrency)
 	groupBy := c.Query("group_by")
 	if groupBy == "" {
 		groupBy = "asset_type"

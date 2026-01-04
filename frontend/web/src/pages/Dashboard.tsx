@@ -185,7 +185,7 @@ const Dashboard: React.FC = () => {
             </h3>
           </div>
           <div className="h-64">
-            <AllocationChart data={allocation} />
+            <AllocationChart key={JSON.stringify(allocation)} data={allocation} />
           </div>
         </motion.div>
       </div>
