@@ -101,6 +101,26 @@ export const getProfile = createAsyncThunk(
   }
 );
 
+// Update user profile
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (profileData: { firstName?: string; lastName?: string; baseCurrency?: string }, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.updateProfile(profileData);
+      const data = response.data.data || response.data;
+      return {
+        id: data.id,
+        email: data.email,
+        firstName: data.first_name || '',
+        lastName: data.last_name || '',
+        baseCurrency: data.base_currency || 'USD',
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to update profile');
+    }
+  }
+);
+
 // Telegram login - authenticate using Telegram initData
 export const telegramLogin = createAsyncThunk(
   'auth/telegramLogin',
@@ -198,6 +218,19 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.token = null;
         localStorage.removeItem('token');
+      })
+      // Update Profile
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       })
       // Telegram Login
       .addCase(telegramLogin.pending, (state) => {

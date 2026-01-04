@@ -69,6 +69,12 @@ export const authAPI = {
       base_currency: data.baseCurrency || 'USD',
     }),
   getProfile: () => api.get('/auth/profile'),
+  updateProfile: (data: { firstName?: string; lastName?: string; baseCurrency?: string }) =>
+    api.put('/auth/profile', {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      base_currency: data.baseCurrency,
+    }),
   refresh: (refreshToken: string) => api.post('/auth/refresh', { refresh_token: refreshToken }),
   googleAuth: (token: string) => api.post('/auth/google', { token }),
   // Telegram auth - sends initData from Telegram WebApp

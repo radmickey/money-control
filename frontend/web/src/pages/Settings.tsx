@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -11,7 +11,8 @@ import {
   Key,
   Save,
 } from 'lucide-react';
-import { useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { updateProfile, getProfile } from '../store/slices/authSlice';
 
 const currencies = [
   { code: 'USD', name: 'US Dollar', symbol: '$' },
@@ -25,12 +26,13 @@ const currencies = [
 ];
 
 const Settings: React.FC = () => {
-  const { user } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
+  const { user, loading } = useAppSelector((state) => state.auth);
   const [activeSection, setActiveSection] = useState('profile');
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    baseCurrency: user?.baseCurrency || 'USD',
+    name: '',
+    email: '',
+    baseCurrency: 'USD',
     notifications: {
       email: true,
       push: true,
@@ -44,6 +46,23 @@ const Settings: React.FC = () => {
   });
   const [saved, setSaved] = useState(false);
 
+  // Load user profile on mount
+  useEffect(() => {
+    dispatch(getProfile());
+  }, [dispatch]);
+
+  // Sync formData with user when user changes
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.firstName || '',
+        email: user.email || '',
+        baseCurrency: user.baseCurrency || 'USD',
+      }));
+    }
+  }, [user]);
+
   const sections = [
     { id: 'profile', icon: User, label: 'Profile' },
     { id: 'currency', icon: Globe, label: 'Currency' },
@@ -52,10 +71,17 @@ const Settings: React.FC = () => {
     { id: 'integrations', icon: CreditCard, label: 'Integrations' },
   ];
 
-  const handleSave = () => {
-    // In a real app, this would dispatch an action to update settings
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await dispatch(updateProfile({
+        firstName: formData.name,
+        baseCurrency: formData.baseCurrency,
+      })).unwrap();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    }
   };
 
   const renderSection = () => {
