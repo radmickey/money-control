@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/radmickey/money-control/backend/pkg/converters"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
@@ -41,8 +42,8 @@ func (h *AccountsHandler) CreateAccount(c *gin.Context) {
 	resp, err := h.proxy.Accounts.CreateAccount(c.Request.Context(), &accountspb.CreateAccountRequest{
 		UserId:      userID,
 		Name:        req.Name,
-		Type:        stringToAccountType(req.Type),
-		Currency:    req.Currency,
+		Type:        converters.StringToAccountType(req.Type),
+		Currency:    converters.DefaultCurrency(req.Currency),
 		Description: req.Description,
 		Icon:        req.Icon,
 	})
@@ -90,15 +91,12 @@ type SubAccountWithConverted struct {
 func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
 	accountType := c.Query("type")
-	baseCurrency := c.Query("currency")
-	if baseCurrency == "" {
-		baseCurrency = "USD"
-	}
+	baseCurrency := converters.DefaultCurrency(c.Query("currency"))
 
 	// Get accounts
 	resp, err := h.proxy.Accounts.ListAccounts(c.Request.Context(), &accountspb.ListAccountsRequest{
 		UserId:   userID,
-		Type:     stringToAccountType(accountType),
+		Type:     converters.StringToAccountType(accountType),
 		Page:     1,
 		PageSize: 100,
 	})
@@ -108,89 +106,10 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 	}
 
 	// Get exchange rates
-	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
-		BaseCurrency: baseCurrency,
-	})
-
-	rates := make(map[string]float64)
-	rates[baseCurrency] = 1.0
-	if err != nil {
-		log.Printf("Warning: Failed to get exchange rates: %v", err)
-	} else if ratesResp != nil {
-		for currency, rate := range ratesResp.Rates {
-			rates[currency] = rate
-		}
-	}
+	rates := h.fetchExchangeRates(c, baseCurrency)
 
 	// Convert accounts
-	accounts := make([]AccountWithConvertedBalance, 0, len(resp.Accounts))
-	for _, acc := range resp.Accounts {
-		accountCurrency := acc.Currency
-		if accountCurrency == "" {
-			accountCurrency = "USD"
-		}
-
-		// Convert sub-accounts and calculate totals
-		var convertedTotal float64        // Total in account's currency
-		var balanceInBaseCurrency float64 // Total in user's base currency (USD)
-		var isMixed bool
-		subAccounts := make([]SubAccountWithConverted, 0, len(acc.SubAccounts))
-
-		currencies := make(map[string]bool)
-		for _, sub := range acc.SubAccounts {
-			subCurrency := sub.Currency
-			if subCurrency == "" {
-				subCurrency = accountCurrency
-			}
-			currencies[subCurrency] = true
-
-			// Convert sub-account balance to account currency (for display)
-			convertedBalance := convertAmount(sub.Balance, subCurrency, accountCurrency, rates)
-			convertedTotal += convertedBalance
-
-			// Convert sub-account balance to base currency (for net worth calculation)
-			balanceInBase := convertAmount(sub.Balance, subCurrency, baseCurrency, rates)
-			balanceInBaseCurrency += balanceInBase
-
-			subAccounts = append(subAccounts, SubAccountWithConverted{
-				ID:               sub.Id,
-				AccountID:        sub.AccountId,
-				Name:             sub.Name,
-				Currency:         subCurrency,
-				Balance:          sub.Balance,
-				ConvertedBalance: convertedBalance,
-				Description:      sub.Description,
-				CreatedAt:        sub.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-				UpdatedAt:        sub.UpdatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-			})
-		}
-
-		// Check if mixed currencies
-		if len(currencies) > 1 || (len(currencies) == 1 && !currencies[accountCurrency]) {
-			isMixed = true
-		}
-
-		// Get account type string
-		accType := accountTypeToString(acc.Type)
-
-		accounts = append(accounts, AccountWithConvertedBalance{
-			ID:                    acc.Id,
-			UserID:                acc.UserId,
-			Name:                  acc.Name,
-			Type:                  accType,
-			Currency:              accountCurrency,
-			Description:           acc.Description,
-			Icon:                  acc.Icon,
-			TotalBalance:          acc.TotalBalance,
-			ConvertedTotalBalance: convertedTotal,
-			BalanceInBaseCurrency: balanceInBaseCurrency,
-			DisplayCurrency:       accountCurrency,
-			IsMixedCurrency:       isMixed,
-			SubAccounts:           subAccounts,
-			CreatedAt:             acc.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-			UpdatedAt:             acc.UpdatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-		})
-	}
+	accounts := h.convertAccountsWithRates(resp.Accounts, baseCurrency, rates)
 
 	utils.Success(c, gin.H{
 		"accounts":      accounts,
@@ -200,50 +119,97 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 	})
 }
 
-// convertAmount converts amount from one currency to another
-func convertAmount(amount float64, from, to string, rates map[string]float64) float64 {
-	if from == to {
-		return amount
-	}
+// fetchExchangeRates fetches exchange rates from currency service
+func (h *AccountsHandler) fetchExchangeRates(c *gin.Context, baseCurrency string) map[string]float64 {
+	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
+		BaseCurrency: baseCurrency,
+	})
 
-	fromRate := rates[from]
-	toRate := rates[to]
-
-	if fromRate == 0 {
-		fromRate = 1
+	rates := converters.BuildRatesMap(baseCurrency, nil)
+	if err != nil {
+		log.Printf("Warning: Failed to get exchange rates: %v", err)
+		return rates
 	}
-	if toRate == 0 {
-		toRate = 1
+	if ratesResp != nil {
+		return converters.BuildRatesMap(baseCurrency, ratesResp.Rates)
 	}
-
-	// Convert: amount in 'from' -> base currency -> 'to' currency
-	// rates are relative to base currency (e.g., USD)
-	// If base is USD: EUR rate = 0.85 means 1 USD = 0.85 EUR
-	// To convert EUR to USD: amount_EUR / 0.85 = amount_USD
-	// To convert USD to EUR: amount_USD * 0.85 = amount_EUR
-	inBase := amount / fromRate
-	return inBase * toRate
+	return rates
 }
 
-// accountTypeToString converts account type enum to string
-func accountTypeToString(t accountspb.AccountType) string {
-	switch t {
-	case accountspb.AccountType_ACCOUNT_TYPE_BANK:
-		return "bank"
-	case accountspb.AccountType_ACCOUNT_TYPE_CASH:
-		return "cash"
-	case accountspb.AccountType_ACCOUNT_TYPE_INVESTMENT:
-		return "investment"
-	case accountspb.AccountType_ACCOUNT_TYPE_CRYPTO:
-		return "crypto"
-	case accountspb.AccountType_ACCOUNT_TYPE_REAL_ESTATE:
-		return "real_estate"
-	case accountspb.AccountType_ACCOUNT_TYPE_OTHER:
-		return "other"
-	default:
-		return "other"
+// convertAccountsWithRates converts account balances using exchange rates
+func (h *AccountsHandler) convertAccountsWithRates(pbAccounts []*accountspb.Account, baseCurrency string, rates map[string]float64) []AccountWithConvertedBalance {
+	accounts := make([]AccountWithConvertedBalance, 0, len(pbAccounts))
+
+	for _, acc := range pbAccounts {
+		accounts = append(accounts, h.convertSingleAccount(acc, baseCurrency, rates))
+	}
+	return accounts
+}
+
+// convertSingleAccount converts a single account with its sub-accounts
+func (h *AccountsHandler) convertSingleAccount(acc *accountspb.Account, baseCurrency string, rates map[string]float64) AccountWithConvertedBalance {
+	accountCurrency := converters.DefaultCurrency(acc.Currency)
+
+	subAccounts, convertedTotal, balanceInBase, isMixed := h.convertSubAccounts(
+		acc.SubAccounts, accountCurrency, baseCurrency, rates,
+	)
+
+	return AccountWithConvertedBalance{
+		ID:                    acc.Id,
+		UserID:                acc.UserId,
+		Name:                  acc.Name,
+		Type:                  converters.AccountTypeToString(acc.Type),
+		Currency:              accountCurrency,
+		Description:           acc.Description,
+		Icon:                  acc.Icon,
+		TotalBalance:          acc.TotalBalance,
+		ConvertedTotalBalance: convertedTotal,
+		BalanceInBaseCurrency: balanceInBase,
+		DisplayCurrency:       accountCurrency,
+		IsMixedCurrency:       isMixed,
+		SubAccounts:           subAccounts,
+		CreatedAt:             converters.FormatTime(acc.CreatedAt),
+		UpdatedAt:             converters.FormatTime(acc.UpdatedAt),
 	}
 }
+
+// convertSubAccounts converts sub-accounts and calculates totals
+func (h *AccountsHandler) convertSubAccounts(subs []*accountspb.SubAccount, accountCurrency, baseCurrency string, rates map[string]float64) ([]SubAccountWithConverted, float64, float64, bool) {
+	var convertedTotal, balanceInBase float64
+	currencies := make(map[string]bool)
+	subAccounts := make([]SubAccountWithConverted, 0, len(subs))
+
+	for _, sub := range subs {
+		subCurrency := converters.DefaultCurrency(sub.Currency)
+		if subCurrency == "" {
+			subCurrency = accountCurrency
+		}
+		currencies[subCurrency] = true
+
+		// Convert balances
+		convertedBalance := converters.ConvertAmount(sub.Balance, subCurrency, accountCurrency, rates)
+		convertedTotal += convertedBalance
+		balanceInBase += converters.ConvertAmount(sub.Balance, subCurrency, baseCurrency, rates)
+
+		subAccounts = append(subAccounts, SubAccountWithConverted{
+			ID:               sub.Id,
+			AccountID:        sub.AccountId,
+			Name:             sub.Name,
+			Currency:         subCurrency,
+			Balance:          sub.Balance,
+			ConvertedBalance: convertedBalance,
+			Description:      sub.Description,
+			CreatedAt:        converters.FormatTime(sub.CreatedAt),
+			UpdatedAt:        converters.FormatTime(sub.UpdatedAt),
+		})
+	}
+
+	// Check if mixed currencies
+	isMixed := len(currencies) > 1 || (len(currencies) == 1 && !currencies[accountCurrency])
+
+	return subAccounts, convertedTotal, balanceInBase, isMixed
+}
+
 
 // GetAccount gets an account
 func (h *AccountsHandler) GetAccount(c *gin.Context) {
@@ -342,7 +308,7 @@ func (h *AccountsHandler) CreateSubAccount(c *gin.Context) {
 		AccountId:   accountID,
 		UserId:      userID,
 		Name:        req.Name,
-		AssetType:   stringToAssetType(assetType),
+		AssetType:   converters.StringToAssetType(assetType),
 		Currency:    req.Currency,
 		Balance:     req.Balance,
 		Symbol:      req.Symbol,
@@ -490,43 +456,3 @@ func (h *AccountsHandler) GetNetWorth(c *gin.Context) {
 	utils.Success(c, resp)
 }
 
-// Helper functions
-func stringToAccountType(s string) accountspb.AccountType {
-	switch s {
-	case "BANK", "bank":
-		return accountspb.AccountType_ACCOUNT_TYPE_BANK
-	case "CASH", "cash":
-		return accountspb.AccountType_ACCOUNT_TYPE_CASH
-	case "INVESTMENT", "investment":
-		return accountspb.AccountType_ACCOUNT_TYPE_INVESTMENT
-	case "CRYPTO", "crypto":
-		return accountspb.AccountType_ACCOUNT_TYPE_CRYPTO
-	case "REAL_ESTATE", "real_estate":
-		return accountspb.AccountType_ACCOUNT_TYPE_REAL_ESTATE
-	case "OTHER", "other":
-		return accountspb.AccountType_ACCOUNT_TYPE_OTHER
-	default:
-		return accountspb.AccountType_ACCOUNT_TYPE_UNSPECIFIED
-	}
-}
-
-func stringToAssetType(s string) accountspb.AssetType {
-	switch s {
-	case "BANK", "bank":
-		return accountspb.AssetType_ASSET_TYPE_BANK
-	case "CASH", "cash":
-		return accountspb.AssetType_ASSET_TYPE_CASH
-	case "STOCKS", "stocks":
-		return accountspb.AssetType_ASSET_TYPE_STOCKS
-	case "CRYPTO", "crypto":
-		return accountspb.AssetType_ASSET_TYPE_CRYPTO
-	case "ETF", "etf":
-		return accountspb.AssetType_ASSET_TYPE_ETF
-	case "REAL_ESTATE", "real_estate":
-		return accountspb.AssetType_ASSET_TYPE_REAL_ESTATE
-	case "BONDS", "bonds":
-		return accountspb.AssetType_ASSET_TYPE_BONDS
-	default:
-		return accountspb.AssetType_ASSET_TYPE_OTHER
-	}
-}

@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"time"
-
 	"github.com/gin-gonic/gin"
+	"github.com/radmickey/money-control/backend/pkg/converters"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	transactionspb "github.com/radmickey/money-control/backend/proto/transactions"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TransactionsHandler handles transactions-related requests
@@ -43,26 +41,17 @@ func (h *TransactionsHandler) CreateTransaction(c *gin.Context) {
 		return
 	}
 
-	var date *timestamppb.Timestamp
-	if req.Date != "" {
-		t, err := time.Parse(time.RFC3339, req.Date)
-		if err != nil {
-			t, _ = time.Parse("2006-01-02", req.Date)
-		}
-		date = timestamppb.New(t)
-	}
-
 	resp, err := h.proxy.Transactions.CreateTransaction(c.Request.Context(), &transactionspb.CreateTransactionRequest{
 		UserId:         userID,
 		SubAccountId:   req.SubAccountID,
 		Amount:         req.Amount,
-		Currency:       req.Currency,
-		Type:           stringToTransactionType(req.Type),
-		Category:       stringToTransactionCategory(req.Category),
+		Currency:       converters.DefaultCurrency(req.Currency),
+		Type:           converters.StringToTransactionType(req.Type),
+		Category:       converters.StringToTransactionCategory(req.Category),
 		CustomCategory: req.CustomCategory,
 		Description:    req.Description,
 		Merchant:       req.Merchant,
-		Date:           date,
+		Date:           converters.ParseDate(req.Date),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
@@ -132,26 +121,15 @@ func (h *TransactionsHandler) UpdateTransaction(c *gin.Context) {
 		return
 	}
 
-	var date *timestamppb.Timestamp
-	if req.Date != "" {
-		t, _ := time.Parse("2006-01-02", req.Date)
-		date = timestamppb.New(t)
-	}
-
-	currency := req.Currency
-	if currency == "" {
-		currency = "USD"
-	}
-
 	resp, err := h.proxy.Transactions.UpdateTransaction(c.Request.Context(), &transactionspb.UpdateTransactionRequest{
 		Id:          id,
 		UserId:      userID,
 		Amount:      req.Amount,
-		Type:        stringToTransactionType(req.Type),
-		Category:    stringToTransactionCategory(req.Category),
+		Type:        converters.StringToTransactionType(req.Type),
+		Category:    converters.StringToTransactionCategory(req.Category),
 		Description: req.Description,
-		Date:        date,
-		Currency:    currency,
+		Date:        converters.ParseDate(req.Date),
+		Currency:    converters.DefaultCurrency(req.Currency),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
@@ -181,25 +159,12 @@ func (h *TransactionsHandler) DeleteTransaction(c *gin.Context) {
 // GetSummary gets transaction summary
 func (h *TransactionsHandler) GetSummary(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	startDateStr := c.Query("start_date")
-	endDateStr := c.Query("end_date")
-	baseCurrency := c.Query("currency")
-
-	var startDate, endDate *timestamppb.Timestamp
-	if startDateStr != "" {
-		t, _ := time.Parse("2006-01-02", startDateStr)
-		startDate = timestamppb.New(t)
-	}
-	if endDateStr != "" {
-		t, _ := time.Parse("2006-01-02", endDateStr)
-		endDate = timestamppb.New(t)
-	}
 
 	resp, err := h.proxy.Transactions.GetTransactionsSummary(c.Request.Context(), &transactionspb.GetTransactionsSummaryRequest{
 		UserId:       userID,
-		StartDate:    startDate,
-		EndDate:      endDate,
-		BaseCurrency: baseCurrency,
+		StartDate:    converters.ParseDate(c.Query("start_date")),
+		EndDate:      converters.ParseDate(c.Query("end_date")),
+		BaseCurrency: converters.DefaultCurrency(c.Query("currency")),
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
@@ -209,39 +174,3 @@ func (h *TransactionsHandler) GetSummary(c *gin.Context) {
 	utils.Success(c, resp)
 }
 
-// Helper functions
-func stringToTransactionType(s string) transactionspb.TransactionType {
-	switch s {
-	case "INCOME", "income":
-		return transactionspb.TransactionType_TRANSACTION_TYPE_INCOME
-	case "EXPENSE", "expense":
-		return transactionspb.TransactionType_TRANSACTION_TYPE_EXPENSE
-	case "TRANSFER", "transfer":
-		return transactionspb.TransactionType_TRANSACTION_TYPE_TRANSFER
-	default:
-		return transactionspb.TransactionType_TRANSACTION_TYPE_UNSPECIFIED
-	}
-}
-
-func stringToTransactionCategory(s string) transactionspb.TransactionCategory {
-	switch s {
-	case "SALARY", "salary":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_SALARY
-	case "FOOD", "food":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_FOOD
-	case "TRANSPORT", "transport":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_TRANSPORT
-	case "SHOPPING", "shopping":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_SHOPPING
-	case "ENTERTAINMENT", "entertainment":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_ENTERTAINMENT
-	case "UTILITIES", "utilities":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_UTILITIES
-	case "HEALTHCARE", "healthcare":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_HEALTHCARE
-	case "TRANSFER", "transfer":
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_TRANSFER
-	default:
-		return transactionspb.TransactionCategory_TRANSACTION_CATEGORY_OTHER
-	}
-}
