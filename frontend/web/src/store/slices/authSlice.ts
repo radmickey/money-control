@@ -42,7 +42,7 @@ const initialState: AuthState = {
   token: localStorage.getItem('token'),
   refreshToken: localStorage.getItem('refreshToken'),
   isAuthenticated: !!localStorage.getItem('token'),
-  loading: !!localStorage.getItem('token') && !getSavedUser(), // Loading if token exists but no user
+  loading: false, // Never start with loading=true, AuthInitializer handles initial load
   error: null,
 };
 
