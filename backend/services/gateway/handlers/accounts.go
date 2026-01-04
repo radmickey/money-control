@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
 	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
 	currencypb "github.com/radmickey/money-control/backend/proto/currency"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
-	"log"
 )
 
 // AccountsHandler handles accounts-related requests
@@ -55,20 +56,21 @@ func (h *AccountsHandler) CreateAccount(c *gin.Context) {
 
 // AccountWithConvertedBalance represents an account with converted total balance
 type AccountWithConvertedBalance struct {
-	ID                    string                   `json:"id"`
-	UserID                string                   `json:"user_id"`
-	Name                  string                   `json:"name"`
-	Type                  string                   `json:"type"`
-	Currency              string                   `json:"currency"`
-	Description           string                   `json:"description,omitempty"`
-	Icon                  string                   `json:"icon,omitempty"`
-	TotalBalance          float64                  `json:"total_balance"`
-	ConvertedTotalBalance float64                  `json:"converted_total_balance"`
-	DisplayCurrency       string                   `json:"display_currency"`
-	IsMixedCurrency       bool                     `json:"is_mixed_currency"`
+	ID                    string                    `json:"id"`
+	UserID                string                    `json:"user_id"`
+	Name                  string                    `json:"name"`
+	Type                  string                    `json:"type"`
+	Currency              string                    `json:"currency"`
+	Description           string                    `json:"description,omitempty"`
+	Icon                  string                    `json:"icon,omitempty"`
+	TotalBalance          float64                   `json:"total_balance"`
+	ConvertedTotalBalance float64                   `json:"converted_total_balance"`  // In account's currency
+	BalanceInBaseCurrency float64                   `json:"balance_in_base_currency"` // In user's base currency (USD)
+	DisplayCurrency       string                    `json:"display_currency"`
+	IsMixedCurrency       bool                      `json:"is_mixed_currency"`
 	SubAccounts           []SubAccountWithConverted `json:"subAccounts,omitempty"`
-	CreatedAt             string                   `json:"created_at"`
-	UpdatedAt             string                   `json:"updated_at"`
+	CreatedAt             string                    `json:"created_at"`
+	UpdatedAt             string                    `json:"updated_at"`
 }
 
 // SubAccountWithConverted represents a sub-account with converted balance
@@ -128,8 +130,9 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 			accountCurrency = "USD"
 		}
 
-		// Convert sub-accounts and calculate total
-		var convertedTotal float64
+		// Convert sub-accounts and calculate totals
+		var convertedTotal float64        // Total in account's currency
+		var balanceInBaseCurrency float64 // Total in user's base currency (USD)
 		var isMixed bool
 		subAccounts := make([]SubAccountWithConverted, 0, len(acc.SubAccounts))
 
@@ -141,9 +144,13 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 			}
 			currencies[subCurrency] = true
 
-			// Convert sub-account balance to account currency
+			// Convert sub-account balance to account currency (for display)
 			convertedBalance := convertAmount(sub.Balance, subCurrency, accountCurrency, rates)
 			convertedTotal += convertedBalance
+
+			// Convert sub-account balance to base currency (for net worth calculation)
+			balanceInBase := convertAmount(sub.Balance, subCurrency, baseCurrency, rates)
+			balanceInBaseCurrency += balanceInBase
 
 			subAccounts = append(subAccounts, SubAccountWithConverted{
 				ID:               sub.Id,
@@ -176,6 +183,7 @@ func (h *AccountsHandler) ListAccounts(c *gin.Context) {
 			Icon:                  acc.Icon,
 			TotalBalance:          acc.TotalBalance,
 			ConvertedTotalBalance: convertedTotal,
+			BalanceInBaseCurrency: balanceInBaseCurrency,
 			DisplayCurrency:       accountCurrency,
 			IsMixedCurrency:       isMixed,
 			SubAccounts:           subAccounts,

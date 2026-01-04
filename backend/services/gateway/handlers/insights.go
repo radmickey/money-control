@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/radmickey/money-control/backend/pkg/middleware"
 	"github.com/radmickey/money-control/backend/pkg/utils"
+	accountspb "github.com/radmickey/money-control/backend/proto/accounts"
+	currencypb "github.com/radmickey/money-control/backend/proto/currency"
 	insightspb "github.com/radmickey/money-control/backend/proto/insights"
 	"github.com/radmickey/money-control/backend/services/gateway/proxy"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -21,24 +24,114 @@ func NewInsightsHandler(sp *proxy.ServiceProxy) *InsightsHandler {
 	return &InsightsHandler{proxy: sp}
 }
 
-// GetNetWorth gets current net worth
+// GetNetWorth gets current net worth with proper currency conversion
 func (h *InsightsHandler) GetNetWorth(c *gin.Context) {
 	userID := middleware.MustGetUserID(c)
-	baseCurrency := c.Query("currency")
+	baseCurrency := c.Query("baseCurrency")
+	if baseCurrency == "" {
+		baseCurrency = c.Query("currency")
+	}
 	if baseCurrency == "" {
 		baseCurrency = "USD"
 	}
 
-	resp, err := h.proxy.Insights.GetNetWorth(c.Request.Context(), &insightspb.GetNetWorthRequest{
-		UserId:       userID,
-		BaseCurrency: baseCurrency,
+	// Get all accounts
+	accountsResp, err := h.proxy.Accounts.ListAccounts(c.Request.Context(), &accountspb.ListAccountsRequest{
+		UserId:   userID,
+		Page:     1,
+		PageSize: 1000,
 	})
 	if err != nil {
 		utils.InternalError(c, err.Error())
 		return
 	}
 
-	utils.Success(c, resp)
+	// Get exchange rates
+	ratesResp, err := h.proxy.Currency.GetMultipleExchangeRates(c.Request.Context(), &currencypb.GetMultipleExchangeRatesRequest{
+		BaseCurrency: baseCurrency,
+	})
+
+	rates := make(map[string]float64)
+	rates[baseCurrency] = 1.0
+	if err != nil {
+		log.Printf("Warning: Failed to get exchange rates: %v", err)
+	} else if ratesResp != nil {
+		for currency, rate := range ratesResp.Rates {
+			rates[currency] = rate
+		}
+	}
+
+	// Calculate total net worth with conversion
+	var totalNetWorth float64
+	for _, acc := range accountsResp.Accounts {
+		accountCurrency := acc.Currency
+		if accountCurrency == "" {
+			accountCurrency = baseCurrency
+		}
+
+		// Sum all sub-accounts with conversion
+		for _, sub := range acc.SubAccounts {
+			subCurrency := sub.Currency
+			if subCurrency == "" {
+				subCurrency = accountCurrency
+			}
+
+			// Convert to base currency
+			converted := convertAmountInsights(sub.Balance, subCurrency, baseCurrency, rates)
+			totalNetWorth += converted
+		}
+	}
+
+	// Get historical data for change calculations (from Insights service)
+	resp, err := h.proxy.Insights.GetNetWorth(c.Request.Context(), &insightspb.GetNetWorthRequest{
+		UserId:       userID,
+		BaseCurrency: baseCurrency,
+	})
+
+	// Return combined result
+	result := gin.H{
+		"total":             totalNetWorth,
+		"currency":          baseCurrency,
+		"change24h":         0.0,
+		"changePercent24h":  0.0,
+		"change7d":          0.0,
+		"changePercent7d":   0.0,
+		"change30d":         0.0,
+		"changePercent30d":  0.0,
+		"calculatedAt":      time.Now(),
+	}
+
+	// Add change data from Insights if available
+	if err == nil && resp != nil {
+		result["change24h"] = resp.Change_24H
+		result["changePercent24h"] = resp.ChangePercent_24H
+		result["change7d"] = resp.Change_7D
+		result["changePercent7d"] = resp.ChangePercent_7D
+		result["change30d"] = resp.Change_30D
+		result["changePercent30d"] = resp.ChangePercent_30D
+	}
+
+	utils.Success(c, result)
+}
+
+// convertAmountInsights converts amount from one currency to another
+func convertAmountInsights(amount float64, from, to string, rates map[string]float64) float64 {
+	if from == to {
+		return amount
+	}
+
+	fromRate := rates[from]
+	toRate := rates[to]
+
+	if fromRate == 0 {
+		fromRate = 1
+	}
+	if toRate == 0 {
+		toRate = 1
+	}
+
+	inBase := amount / fromRate
+	return inBase * toRate
 }
 
 // GetTrends gets net worth trends/history

@@ -53,13 +53,13 @@ export const fetchNetWorth = createAsyncThunk(
       const response = await insightsAPI.getNetWorth(baseCurrency);
       const data = extractData(response);
       return {
-        total: data?.total_net_worth || data?.totalNetWorth || 0,
-        change24h: data?.change_24h || data?.change24h || 0,
-        changePercent24h: data?.change_percent_24h || data?.changePercent24h || 0,
-        change7d: data?.change_7d || data?.change7d || 0,
-        changePercent7d: data?.change_percent_7d || data?.changePercent7d || 0,
-        change30d: data?.change_30d || data?.change30d || 0,
-        changePercent30d: data?.change_percent_30d || data?.changePercent30d || 0,
+        total: data?.total ?? data?.total_net_worth ?? data?.totalNetWorth ?? 0,
+        change24h: data?.change24h ?? data?.change_24h ?? 0,
+        changePercent24h: data?.changePercent24h ?? data?.change_percent_24h ?? 0,
+        change7d: data?.change7d ?? data?.change_7d ?? 0,
+        changePercent7d: data?.changePercent7d ?? data?.change_percent_7d ?? 0,
+        change30d: data?.change30d ?? data?.change_30d ?? 0,
+        changePercent30d: data?.changePercent30d ?? data?.change_percent_30d ?? 0,
       };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.error || 'Failed to fetch net worth');

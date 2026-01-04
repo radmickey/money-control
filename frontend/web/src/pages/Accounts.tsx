@@ -150,7 +150,7 @@ const Accounts: React.FC = () => {
   };
 
   const getIcon = (type: string | number): React.ElementType => {
-    const typeStr = typeof type === 'number' 
+    const typeStr = typeof type === 'number'
       ? ['other', 'bank', 'cash', 'investment', 'crypto', 'real_estate', 'other'][type] || 'other'
       : type;
     return accountTypeIcons[typeStr] || Wallet;
@@ -216,7 +216,7 @@ const Accounts: React.FC = () => {
             const displayCurrency = account.displayCurrency || account.currency || 'USD';
             const totalBalance = account.convertedTotalBalance ?? account.totalBalance ?? 0;
             const isMixed = account.isMixedCurrency ?? false;
-            
+
             return (
               <motion.div
                 key={account.id}

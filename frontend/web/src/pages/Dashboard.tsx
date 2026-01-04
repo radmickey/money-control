@@ -104,10 +104,11 @@ const Dashboard: React.FC = () => {
     dispatch(fetchTransactions({}));
   };
 
-  // Calculate totals by account type
-  const accountsByType = (Array.isArray(accounts) ? accounts : []).reduce((acc, account) => {
+  // Calculate totals by account type (using base currency balances from backend)
+  const accountsByType = (Array.isArray(accounts) ? accounts : []).reduce((acc, account: any) => {
     const type = formatAccountType(account.type);
-    acc[type] = (acc[type] || 0) + (account.totalBalance || 0);
+    // Use balanceInBaseCurrency from backend (already in user's base currency USD)
+    acc[type] = (acc[type] || 0) + (account.balanceInBaseCurrency ?? account.totalBalance ?? 0);
     return acc;
   }, {} as { [key: string]: number });
 
@@ -253,15 +254,19 @@ const Dashboard: React.FC = () => {
             </Link>
           </div>
           <div className="space-y-3">
-            {(Array.isArray(accounts) ? accounts : []).slice(0, 4).map((account) => {
+            {(Array.isArray(accounts) ? accounts : []).slice(0, 4).map((account: any) => {
               const Icon = getAccountTypeIcon(account.type);
+              // Use converted values from backend
+              const displayBalance = account.convertedTotalBalance ?? account.totalBalance ?? 0;
+              const displayCurrency = account.displayCurrency || account.currency || 'USD';
+              const isMixed = account.isMixedCurrency;
               return (
                 <div key={account.id} className="flex items-center justify-between p-3 rounded-lg bg-midnight-900/30 hover:bg-midnight-800/30 transition-colors">
                   <div className="flex items-center gap-3">
                     <Icon className="w-5 h-5 text-midnight-400" />
                     <span className="font-medium truncate max-w-[120px]">{account.name}</span>
                   </div>
-                  <span className="font-semibold">{formatCurrency(account.totalBalance, account.currency)}</span>
+                  <span className="font-semibold">{isMixed ? '~' : ''}{formatCurrency(displayBalance, displayCurrency)}</span>
                 </div>
               );
             })}

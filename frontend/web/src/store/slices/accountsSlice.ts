@@ -17,7 +17,8 @@ export interface Account {
   currency: string;
   totalBalance: number;
   // Pre-calculated by backend
-  convertedTotalBalance?: number;
+  convertedTotalBalance?: number;  // In account's display currency
+  balanceInBaseCurrency?: number;  // In user's base currency (for net worth)
   displayCurrency?: string;
   isMixedCurrency?: boolean;
   subAccounts: SubAccount[];
@@ -54,6 +55,7 @@ const mapApiAccount = (apiAccount: any): Account => ({
   totalBalance: apiAccount.total_balance || apiAccount.totalBalance || 0,
   // New fields from backend conversion
   convertedTotalBalance: apiAccount.converted_total_balance ?? apiAccount.convertedTotalBalance ?? apiAccount.total_balance ?? 0,
+  balanceInBaseCurrency: apiAccount.balance_in_base_currency ?? apiAccount.balanceInBaseCurrency ?? apiAccount.total_balance ?? 0,
   displayCurrency: apiAccount.display_currency || apiAccount.displayCurrency || apiAccount.currency || 'USD',
   isMixedCurrency: apiAccount.is_mixed_currency ?? apiAccount.isMixedCurrency ?? false,
   subAccounts: (apiAccount.sub_accounts || apiAccount.subAccounts || []).map((sub: any) => ({
