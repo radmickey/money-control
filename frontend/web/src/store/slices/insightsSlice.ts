@@ -75,7 +75,13 @@ export const fetchAllocation = createAsyncThunk(
       const response = await insightsAPI.getAllocation(baseCurrency);
       const data = extractData(response);
       const allocations = data?.allocations || data || [];
-      return Array.isArray(allocations) ? allocations : [];
+      // Map API response to our interface (value -> amount)
+      return Array.isArray(allocations) ? allocations.map((item: any) => ({
+        category: item.category || item.name || 'Unknown',
+        amount: item.value ?? item.amount ?? 0,
+        percentage: item.percentage ?? 0,
+        color: item.color || '#9C27B0',
+      })) : [];
     } catch (error: any) {
       return rejectWithValue(extractErrorMessage(error, 'Failed to fetch allocation'));
     }
