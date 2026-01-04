@@ -3,29 +3,17 @@ import { motion } from 'framer-motion';
 import {
   Plus,
   Wallet,
-  Building2,
-  Banknote,
-  TrendingUp,
-  Bitcoin,
-  Home,
   MoreVertical,
   Edit,
   Trash2,
   ChevronDown,
   ChevronUp,
-  X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchAccounts, createAccount, updateAccount, deleteAccount, createSubAccount, updateSubAccount, deleteSubAccount } from '../store/slices/accountsSlice';
-
-const accountTypeIcons: { [key: string]: React.ElementType } = {
-  bank: Building2,
-  cash: Banknote,
-  investment: TrendingUp,
-  crypto: Bitcoin,
-  real_estate: Home,
-  other: Wallet,
-};
+import { formatCurrency, formatAccountType, getAccountTypeKey } from '../utils/formatters';
+import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPES } from '../constants';
+import Modal, { FormField, CancelButton, SubmitButton, CurrencySelect } from '../components/common/Modal';
 
 const Accounts: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -139,37 +127,8 @@ const Accounts: React.FC = () => {
     }
   };
 
-  // Simple currency formatting - no conversion logic needed
-  const formatCurrency = (amount: number, currency: string): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
   const getIcon = (type: string | number): React.ElementType => {
-    const typeStr = typeof type === 'number'
-      ? ['other', 'bank', 'cash', 'investment', 'crypto', 'real_estate', 'other'][type] || 'other'
-      : type;
-    return accountTypeIcons[typeStr] || Wallet;
-  };
-
-  const formatAccountType = (type: string | number): string => {
-    const typeMap: { [key: number]: string } = {
-      0: 'Other',
-      1: 'Bank',
-      2: 'Cash',
-      3: 'Investment',
-      4: 'Crypto',
-      5: 'Real Estate',
-      6: 'Other',
-    };
-    if (typeof type === 'number') {
-      return typeMap[type] || 'Other';
-    }
-    return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
+    return ACCOUNT_TYPE_ICONS[getAccountTypeKey(type)] || Wallet;
   };
 
   return (
@@ -334,288 +293,161 @@ const Accounts: React.FC = () => {
       )}
 
       {/* Create Account Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-2xl p-6 w-full max-w-md"
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create Account"
+        footer={
+          <>
+            <CancelButton onClick={() => setShowCreateModal(false)} />
+            <SubmitButton onClick={handleCreateAccount} disabled={!newAccount.name}>
+              Create
+            </SubmitButton>
+          </>
+        }
+      >
+        <FormField label="Account Name">
+          <input
+            type="text"
+            value={newAccount.name}
+            onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
+            className="input-field"
+            placeholder="e.g., Main Bank Account"
+          />
+        </FormField>
+        <FormField label="Type">
+          <select
+            value={newAccount.type}
+            onChange={(e) => setNewAccount({ ...newAccount, type: e.target.value })}
+            className="input-field"
           >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Create Account</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-2 text-midnight-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Account Name</label>
-                <input
-                  type="text"
-                  value={newAccount.name}
-                  onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
-                  className="input-field"
-                  placeholder="e.g., Main Bank Account"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Type</label>
-                <select
-                  value={newAccount.type}
-                  onChange={(e) => setNewAccount({ ...newAccount, type: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="bank">Bank</option>
-                  <option value="cash">Cash</option>
-                  <option value="investment">Investment</option>
-                  <option value="crypto">Crypto</option>
-                  <option value="real_estate">Real Estate</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Currency</label>
-                <select
-                  value={newAccount.currency}
-                  onChange={(e) => setNewAccount({ ...newAccount, currency: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="USD">USD - US Dollar</option>
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="GBP">GBP - British Pound</option>
-                  <option value="RUB">RUB - Russian Ruble</option>
-                  <option value="JPY">JPY - Japanese Yen</option>
-                  <option value="CHF">CHF - Swiss Franc</option>
-                  <option value="CAD">CAD - Canadian Dollar</option>
-                  <option value="AUD">AUD - Australian Dollar</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateAccount}
-                disabled={!newAccount.name}
-                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Create
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+            {ACCOUNT_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Currency">
+          <CurrencySelect
+            value={newAccount.currency}
+            onChange={(v) => setNewAccount({ ...newAccount, currency: v })}
+          />
+        </FormField>
+      </Modal>
 
       {/* Edit Account Modal */}
-      {showEditModal && editingAccount && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-2xl p-6 w-full max-w-md"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Edit Account</h3>
-              <button
-                onClick={() => { setShowEditModal(false); setEditingAccount(null); }}
-                className="p-2 text-midnight-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Account Name</label>
-                <input
-                  type="text"
-                  value={editingAccount.name}
-                  onChange={(e) => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                  className="input-field"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setShowEditModal(false); setEditingAccount(null); }}
-                className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditAccount}
-                disabled={!editingAccount.name}
-                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Save Changes
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <Modal
+        isOpen={showEditModal && !!editingAccount}
+        onClose={() => { setShowEditModal(false); setEditingAccount(null); }}
+        title="Edit Account"
+        footer={
+          <>
+            <CancelButton onClick={() => { setShowEditModal(false); setEditingAccount(null); }} />
+            <SubmitButton onClick={handleEditAccount} disabled={!editingAccount?.name}>
+              Save Changes
+            </SubmitButton>
+          </>
+        }
+      >
+        {editingAccount && (
+          <FormField label="Account Name">
+            <input
+              type="text"
+              value={editingAccount.name}
+              onChange={(e) => setEditingAccount({ ...editingAccount, name: e.target.value })}
+              className="input-field"
+            />
+          </FormField>
+        )}
+      </Modal>
 
       {/* Create Sub-Account Modal */}
-      {showSubAccountModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-2xl p-6 w-full max-w-md"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Add Sub-Account</h3>
-              <button
-                onClick={() => setShowSubAccountModal(false)}
-                className="p-2 text-midnight-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={newSubAccount.name}
-                  onChange={(e) => setNewSubAccount({ ...newSubAccount, name: e.target.value })}
-                  className="input-field"
-                  placeholder="e.g., Savings, USD Account"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Initial Balance</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={newSubAccount.balance}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      setNewSubAccount({ ...newSubAccount, balance: value });
-                    }
-                  }}
-                  className="input-field"
-                  placeholder="Enter amount"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Currency</label>
-                <select
-                  value={newSubAccount.currency}
-                  onChange={(e) => setNewSubAccount({ ...newSubAccount, currency: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="USD">USD - US Dollar</option>
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="GBP">GBP - British Pound</option>
-                  <option value="RUB">RUB - Russian Ruble</option>
-                  <option value="JPY">JPY - Japanese Yen</option>
-                  <option value="CHF">CHF - Swiss Franc</option>
-                  <option value="CAD">CAD - Canadian Dollar</option>
-                  <option value="AUD">AUD - Australian Dollar</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowSubAccountModal(false)}
-                className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateSubAccount}
-                disabled={!newSubAccount.name}
-                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <Modal
+        isOpen={showSubAccountModal}
+        onClose={() => setShowSubAccountModal(false)}
+        title="Add Sub-Account"
+        footer={
+          <>
+            <CancelButton onClick={() => setShowSubAccountModal(false)} />
+            <SubmitButton onClick={handleCreateSubAccount} disabled={!newSubAccount.name}>
+              Add
+            </SubmitButton>
+          </>
+        }
+      >
+        <FormField label="Name">
+          <input
+            type="text"
+            value={newSubAccount.name}
+            onChange={(e) => setNewSubAccount({ ...newSubAccount, name: e.target.value })}
+            className="input-field"
+            placeholder="e.g., Savings, USD Account"
+          />
+        </FormField>
+        <FormField label="Initial Balance">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={newSubAccount.balance}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setNewSubAccount({ ...newSubAccount, balance: value });
+              }
+            }}
+            className="input-field"
+            placeholder="Enter amount"
+          />
+        </FormField>
+        <FormField label="Currency">
+          <CurrencySelect
+            value={newSubAccount.currency}
+            onChange={(v) => setNewSubAccount({ ...newSubAccount, currency: v })}
+          />
+        </FormField>
+      </Modal>
 
       {/* Edit Sub-Account Modal */}
-      {showEditSubAccountModal && editingSubAccount && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-2xl p-6 w-full max-w-md"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Edit Sub-Account</h3>
-              <button
-                onClick={() => { setShowEditSubAccountModal(false); setEditingSubAccount(null); }}
-                className="p-2 text-midnight-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={editingSubAccount.name}
-                  onChange={(e) => setEditingSubAccount({ ...editingSubAccount, name: e.target.value })}
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-midnight-400 mb-2">Balance</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={editingSubAccount.balance}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      setEditingSubAccount({ ...editingSubAccount, balance: value });
-                    }
-                  }}
-                  className="input-field"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setShowEditSubAccountModal(false); setEditingSubAccount(null); }}
-                className="flex-1 px-4 py-3 rounded-xl border border-midnight-700 text-midnight-300 hover:bg-midnight-800/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateSubAccount}
-                disabled={!editingSubAccount.name}
-                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Save Changes
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <Modal
+        isOpen={showEditSubAccountModal && !!editingSubAccount}
+        onClose={() => { setShowEditSubAccountModal(false); setEditingSubAccount(null); }}
+        title="Edit Sub-Account"
+        footer={
+          <>
+            <CancelButton onClick={() => { setShowEditSubAccountModal(false); setEditingSubAccount(null); }} />
+            <SubmitButton onClick={handleUpdateSubAccount} disabled={!editingSubAccount?.name}>
+              Save Changes
+            </SubmitButton>
+          </>
+        }
+      >
+        {editingSubAccount && (
+          <>
+            <FormField label="Name">
+              <input
+                type="text"
+                value={editingSubAccount.name}
+                onChange={(e) => setEditingSubAccount({ ...editingSubAccount, name: e.target.value })}
+                className="input-field"
+              />
+            </FormField>
+            <FormField label="Balance">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={editingSubAccount.balance}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setEditingSubAccount({ ...editingSubAccount, balance: value });
+                  }
+                }}
+                className="input-field"
+                placeholder="0.00"
+              />
+            </FormField>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

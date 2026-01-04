@@ -8,46 +8,13 @@ import {
   Search,
   Edit,
   Trash2,
-  X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchTransactions, createTransaction, updateTransaction, deleteTransaction, setFilters } from '../store/slices/transactionsSlice';
 import { fetchAccounts } from '../store/slices/accountsSlice';
-
-const categories = [
-  'Food & Dining',
-  'Transportation',
-  'Shopping',
-  'Entertainment',
-  'Bills & Utilities',
-  'Healthcare',
-  'Travel',
-  'Education',
-  'Income',
-  'Investment',
-  'Transfer',
-  'Other',
-];
-
-const typeMap: { [key: number]: string } = {
-  0: 'unspecified',
-  1: 'income',
-  2: 'expense',
-  3: 'transfer',
-};
-
-const categoryMap: { [key: number]: string } = {
-  0: 'Other',
-  1: 'Salary',
-  2: 'Food & Dining',
-  3: 'Transportation',
-  4: 'Shopping',
-  5: 'Entertainment',
-  6: 'Healthcare',
-  7: 'Bills & Utilities',
-  8: 'Transfer',
-  9: 'Other',
-};
+import { formatCurrency, formatDate, getTransactionType, getTransactionCategory } from '../utils/formatters';
+import { TRANSACTION_CATEGORIES, TRANSACTION_TYPES } from '../constants';
+import Modal, { FormField, CancelButton, SubmitButton, CurrencySelect } from '../components/common/Modal';
 
 interface TransactionForm {
   amount: string;
@@ -149,48 +116,6 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const formatCurrency = (value: number, currency: string = 'USD') => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'USD',
-      }).format(Math.abs(value));
-    } catch {
-      return `${currency} ${Math.abs(value).toFixed(2)}`;
-    }
-  };
-
-  const formatDate = (dateValue: string | { seconds?: number; nanos?: number }) => {
-    let date: Date;
-    if (typeof dateValue === 'object' && dateValue.seconds) {
-      date = new Date(dateValue.seconds * 1000);
-    } else if (typeof dateValue === 'string') {
-      date = new Date(dateValue);
-    } else {
-      return 'N/A';
-    }
-    if (isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getTransactionType = (type: string | number): string => {
-    if (typeof type === 'number') {
-      return typeMap[type] || 'expense';
-    }
-    return type;
-  };
-
-  const getTransactionCategory = (category: string | number): string => {
-    if (typeof category === 'number') {
-      return categoryMap[category] || 'Other';
-    }
-    return category;
-  };
-
   const getTypeIcon = (type: string | number) => {
     const typeStr = getTransactionType(type);
     switch (typeStr) {
@@ -271,7 +196,7 @@ const Transactions: React.FC = () => {
           className="input-field w-auto min-w-[160px]"
         >
           <option value="">All Categories</option>
-          {categories.map((cat) => (
+          {TRANSACTION_CATEGORIES.map((cat) => (
             <option key={cat} value={cat}>
               {cat}
             </option>

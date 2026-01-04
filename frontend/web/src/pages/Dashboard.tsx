@@ -5,11 +5,6 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  Building2,
-  Banknote,
-  Bitcoin,
-  Home,
-  BarChart3,
   ArrowUpRight,
   ArrowDownRight,
   ArrowLeftRight,
@@ -24,15 +19,8 @@ import { fetchAssets } from '../store/slices/assetsSlice';
 import { fetchTransactions } from '../store/slices/transactionsSlice';
 import AllocationChart from '../components/charts/AllocationChart';
 import TrendChart from '../components/charts/TrendChart';
-
-const accountTypeIcons: { [key: string]: React.ElementType } = {
-  bank: Building2,
-  cash: Banknote,
-  investment: BarChart3,
-  crypto: Bitcoin,
-  real_estate: Home,
-  other: Wallet,
-};
+import { formatCurrency, formatPercent, formatAccountType, getAccountTypeKey, getTransactionType } from '../utils/formatters';
+import { DASHBOARD_ACCOUNT_ICONS } from '../constants';
 
 const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -53,47 +41,11 @@ const Dashboard: React.FC = () => {
     dispatch(fetchTransactions({}));
   }, [dispatch, baseCurrency]);
 
-  const formatCurrency = (value: number | undefined | null, currency?: string) => {
-    const safeValue = value ?? 0;
-    const curr = currency || baseCurrency;
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: curr,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(safeValue);
-    } catch {
-      return `${curr} ${safeValue.toFixed(0)}`;
-    }
-  };
+  const fmtCurrency = (value: number | undefined | null, currency?: string) =>
+    formatCurrency(value, currency || baseCurrency, false);
 
-  const formatPercent = (value: number | undefined | null) => {
-    if (value === undefined || value === null) return '+0.00%';
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(2)}%`;
-  };
-
-  const getAccountTypeIcon = (type: string | number) => {
-    const typeMap: { [key: number]: string } = {
-      0: 'other', 1: 'bank', 2: 'cash', 3: 'investment', 4: 'crypto', 5: 'real_estate', 6: 'other',
-    };
-    const typeString = typeof type === 'number' ? (typeMap[type] || 'other') : type;
-    return accountTypeIcons[typeString.toLowerCase()] || Wallet;
-  };
-
-  const formatAccountType = (type: string | number): string => {
-    const typeMap: { [key: number]: string } = {
-      0: 'Other', 1: 'Bank', 2: 'Cash', 3: 'Investment', 4: 'Crypto', 5: 'Real Estate', 6: 'Other',
-    };
-    if (typeof type === 'number') return typeMap[type] || 'Other';
-    return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
-  };
-
-  const getTransactionType = (type: string | number): string => {
-    const typeMap: { [key: number]: string } = { 0: 'expense', 1: 'income', 2: 'expense', 3: 'transfer' };
-    return typeof type === 'number' ? (typeMap[type] || 'expense') : type;
-  };
+  const getAccountTypeIcon = (type: string | number) =>
+    DASHBOARD_ACCOUNT_ICONS[getAccountTypeKey(type)] || Wallet;
 
   const handleRefresh = () => {
     dispatch(fetchNetWorth(baseCurrency));
@@ -151,7 +103,7 @@ const Dashboard: React.FC = () => {
             Total Net Worth
           </p>
           <h2 className="text-5xl md:text-6xl font-display font-bold mt-2 bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-            {formatCurrency(netWorth?.total)}
+            {fmtCurrency(netWorth?.total)}
           </h2>
           <div className="flex items-center gap-6 mt-4">
             <div className={`flex items-center gap-2 ${(netWorth?.change24h || 0) >= 0 ? 'text-accent-emerald' : 'text-accent-coral'}`}>
@@ -171,7 +123,7 @@ const Dashboard: React.FC = () => {
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {Object.entries(accountsByType).slice(0, 4).map(([type, value], index) => {
-          const Icon = accountTypeIcons[type.toLowerCase()] || Wallet;
+          const Icon = DASHBOARD_ACCOUNT_ICONS[type.toLowerCase()] || Wallet;
           return (
             <motion.div
               key={type}
@@ -186,7 +138,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-midnight-400">{type}</p>
-                  <p className="text-lg font-semibold">{formatCurrency(value)}</p>
+                  <p className="text-lg font-semibold">{fmtCurrency(value)}</p>
                 </div>
               </div>
             </motion.div>
@@ -266,7 +218,7 @@ const Dashboard: React.FC = () => {
                     <Icon className="w-5 h-5 text-midnight-400" />
                     <span className="font-medium truncate max-w-[120px]">{account.name}</span>
                   </div>
-                  <span className="font-semibold">{isMixed ? '~' : ''}{formatCurrency(displayBalance, displayCurrency)}</span>
+                  <span className="font-semibold">{isMixed ? '~' : ''}{fmtCurrency(displayBalance, displayCurrency)}</span>
                 </div>
               );
             })}
@@ -302,7 +254,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold">{formatCurrency((asset.currentValue || asset.purchasePrice || 0) * (asset.quantity || 1))}</p>
+                  <p className="font-semibold">{fmtCurrency((asset.currentValue || asset.purchasePrice || 0) * (asset.quantity || 1))}</p>
                   {asset.currentValue && asset.purchasePrice && (
                     <p className={`text-xs ${asset.currentValue > asset.purchasePrice ? 'text-accent-emerald' : 'text-accent-coral'}`}>
                       {asset.currentValue > asset.purchasePrice ? '+' : ''}{(((asset.currentValue - asset.purchasePrice) / asset.purchasePrice) * 100).toFixed(1)}%
@@ -320,7 +272,7 @@ const Dashboard: React.FC = () => {
             {totalAssetsValue > 0 && (
               <div className="pt-3 border-t border-midnight-800/50 flex justify-between">
                 <span className="text-midnight-400">Total Value</span>
-                <span className="font-semibold">{formatCurrency(totalAssetsValue)}</span>
+                <span className="font-semibold">{fmtCurrency(totalAssetsValue)}</span>
               </div>
             )}
           </div>
@@ -360,7 +312,7 @@ const Dashboard: React.FC = () => {
                     <p className="font-medium truncate max-w-[100px]">{tx.description || 'No description'}</p>
                   </div>
                   <p className={`font-semibold ${txType === 'income' ? 'text-accent-emerald' : 'text-accent-coral'}`}>
-                    {txType === 'income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), tx.currency)}
+                    {txType === 'income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount), tx.currency)}
                   </p>
                 </div>
               );
